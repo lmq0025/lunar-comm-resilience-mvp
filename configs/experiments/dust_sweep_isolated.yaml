@@ -1,0 +1,19 @@
+experiment:
+  name: dust_sweep_isolated
+  type: sweep
+  purpose: Isolate lunar dust physical-layer effects without mission fault interference.
+parameter:
+  name: dust_level
+  values: [0.0, 0.1, 0.2, 0.35, 0.5, 0.7, 0.9]
+mutations:
+  disable_fault_types:
+    - main_hub_failure
+    - buffer_overflow
+    - relay_handover_delay
+output_metrics:
+  - antenna_gain_db
+  - snr_db
+  - packet_loss_rate
+  - ka_active_path_availability
+  - predicted_gain_loss_db
+  - dust_gain_loss_quantification_error_pct

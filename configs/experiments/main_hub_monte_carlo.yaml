@@ -1,0 +1,42 @@
+experiment:
+  name: main_hub_monte_carlo
+  type: monte_carlo
+  purpose: Estimate subnet paralysis risk after main hub failure.
+  n_runs: 1000
+  random_seed: 2026
+  save_run_scenarios: false
+risk_target: 0.01
+stochastic:
+  enabled: true
+  link_failure_sampling: true
+  sampled_link_kinds:
+    - redundant_surface
+    - surface_to_orbit
+  node_failure_sampling: false
+randomized_parameters:
+  main_hub_failure_severity:
+    distribution: uniform
+    min: 0.75
+    max: 1.0
+  backup_link_availability:
+    distribution: uniform
+    min: 0.994
+    max: 0.9995
+  dust_level:
+    distribution: uniform
+    min: 0.0
+    max: 0.9
+  relay_handover_extra_delay_ms:
+    distribution: uniform
+    min: 0
+    max: 200
+  buffer_overflow_severity:
+    distribution: uniform
+    min: 0.1
+    max: 0.8
+output_metrics:
+  - subnet_paralysis_probability
+  - route_convergence_time_ms
+  - science_data_interruption_s
+  - video_return_success_rate
+  - control_command_loss_rate

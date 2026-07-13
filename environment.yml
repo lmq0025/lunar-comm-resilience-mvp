@@ -1,0 +1,17 @@
+name: lunar-comm-resilience-mvp
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - networkx
+  - simpy
+  - pydantic
+  - pyyaml
+  - matplotlib
+  - plotly
+  - streamlit
+  - typer
+  - rich
+  - pytest

@@ -1,0 +1,17 @@
+experiment:
+  name: relay_handover_sweep
+  type: sweep
+  purpose: Quantify relay handover disturbance sensitivity.
+parameter:
+  name: relay_handover_extra_delay_ms
+  values: [0, 25, 50, 75, 100, 120, 150, 200]
+healing_enabled:
+  - reroute_backup_path
+  - priority_scheduling
+  - service_degradation
+  - store_and_forward
+output_metrics:
+  - relay_handover_delay_disturbance_ms
+  - route_convergence_time_ms
+  - end_to_end_delay_ms
+  - science_data_interruption_s

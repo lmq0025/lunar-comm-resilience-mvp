@@ -1,0 +1,13 @@
+experiment:
+  name: dust_sweep
+  type: sweep
+  purpose: Quantify lunar dust impact on RF and service metrics.
+parameter:
+  name: dust_level
+  values: [0.0, 0.1, 0.2, 0.35, 0.5, 0.7, 0.9]
+output_metrics:
+  - antenna_gain_db
+  - snr_db
+  - packet_loss_rate
+  - ka_active_path_availability
+  - video_return_success_rate

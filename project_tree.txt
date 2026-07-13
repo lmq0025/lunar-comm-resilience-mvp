@@ -1,0 +1,457 @@
+﻿卷 新加卷 的文件夹 PATH 列表
+卷序列号为 000000D5 C483:ACC1
+E:.
+|   environment.yml
+|   MANIFEST.md
+|   PROJECT_BRIEF.md
+|   project_tree.txt
+|   pytest.ini
+|   README.md
+|   requirements.txt
+|   
++---.agents
++---.git
++---.pytest_cache
++---.streamlit
+|       config.toml
+|       
++---configs
+|   |   default_scenario.yaml
+|   |   
+|   \---experiments
+|           dust_sweep.yaml
+|           dust_sweep_full_mission.yaml
+|           dust_sweep_isolated.yaml
+|           healing_ablation.yaml
+|           main_hub_monte_carlo.yaml
+|           main_hub_monte_carlo_fast.yaml
+|           relay_handover_sweep.yaml
+|           
++---data
+|   \---baselines
+|           dust_gain_reference.csv
+|           rf_lifetime_reference.csv
+|           
++---docs
+|   |   model_assumptions.md
+|   |   mvp_design.md
+|   |   round2_refactor_notes.md
+|   |   round4_experiment_design.md
+|   |   round5_experiment_statistics_and_dashboard.md
+|   |   round6_fault_propagation_model.md
+|   |   round7_physical_model_validation.md
+|   |   technical_indicators.md
+|   |   
+|   \---final_delivery
+|           demo_script_for_customer.md
+|           final_mvp_summary.md
+|           indicator_verification_report.md
+|           model_assumption_and_limitations.md
+|           research_task_mapping.md
+|           software_function_list.md
+|           
++---lunar_comm_sim
+|   |   __init__.py
+|   |   
+|   +---app
+|   |   |   cli.py
+|   |   |   dashboard.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---__pycache__
+|   |           cli.cpython-311.pyc
+|   |           cli.cpython-313.pyc
+|   |           dashboard.cpython-311.pyc
+|   |           dashboard.cpython-313.pyc
+|   |           __init__.cpython-311.pyc
+|   |           __init__.cpython-313.pyc
+|   |           
+|   +---core
+|   |   |   environment.py
+|   |   |   faults.py
+|   |   |   healing.py
+|   |   |   metrics.py
+|   |   |   physical_models.py
+|   |   |   propagation.py
+|   |   |   reporting.py
+|   |   |   routing.py
+|   |   |   scenario.py
+|   |   |   services.py
+|   |   |   topology.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---__pycache__
+|   |           environment.cpython-311.pyc
+|   |           environment.cpython-313.pyc
+|   |           faults.cpython-311.pyc
+|   |           faults.cpython-313.pyc
+|   |           healing.cpython-311.pyc
+|   |           healing.cpython-313.pyc
+|   |           metrics.cpython-311.pyc
+|   |           metrics.cpython-313.pyc
+|   |           physical_models.cpython-311.pyc
+|   |           physical_models.cpython-313.pyc
+|   |           propagation.cpython-311.pyc
+|   |           propagation.cpython-313.pyc
+|   |           reporting.cpython-311.pyc
+|   |           reporting.cpython-313.pyc
+|   |           routing.cpython-311.pyc
+|   |           routing.cpython-313.pyc
+|   |           scenario.cpython-311.pyc
+|   |           scenario.cpython-313.pyc
+|   |           services.cpython-311.pyc
+|   |           services.cpython-313.pyc
+|   |           topology.cpython-311.pyc
+|   |           topology.cpython-313.pyc
+|   |           __init__.cpython-311.pyc
+|   |           __init__.cpython-313.pyc
+|   |           
+|   +---experiments
+|   |   |   ablation.py
+|   |   |   experiment_runner.py
+|   |   |   monte_carlo.py
+|   |   |   runner.py
+|   |   |   scenario_mutator.py
+|   |   |   stochastic.py
+|   |   |   summarize.py
+|   |   |   sweep.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---__pycache__
+|   |           ablation.cpython-311.pyc
+|   |           ablation.cpython-313.pyc
+|   |           experiment_runner.cpython-311.pyc
+|   |           experiment_runner.cpython-313.pyc
+|   |           monte_carlo.cpython-311.pyc
+|   |           monte_carlo.cpython-313.pyc
+|   |           runner.cpython-311.pyc
+|   |           runner.cpython-313.pyc
+|   |           scenario_mutator.cpython-311.pyc
+|   |           scenario_mutator.cpython-313.pyc
+|   |           stochastic.cpython-311.pyc
+|   |           stochastic.cpython-313.pyc
+|   |           summarize.cpython-311.pyc
+|   |           summarize.cpython-313.pyc
+|   |           sweep.cpython-311.pyc
+|   |           sweep.cpython-313.pyc
+|   |           __init__.cpython-311.pyc
+|   |           __init__.cpython-313.pyc
+|   |           
+|   +---sim
+|   |   |   engine.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---__pycache__
+|   |           engine.cpython-311.pyc
+|   |           engine.cpython-313.pyc
+|   |           __init__.cpython-311.pyc
+|   |           __init__.cpython-313.pyc
+|   |           
+|   \---__pycache__
+|           __init__.cpython-311.pyc
+|           __init__.cpython-313.pyc
+|           
++---outputs
+|   +---demo_run
+|   |       fault_events.csv
+|   |       fault_propagation_comparison.csv
+|   |       fault_propagation_metrics.csv
+|   |       fault_propagation_predictions.csv
+|   |       healing_actions.csv
+|   |       indicator_check.csv
+|   |       metrics_summary.csv
+|   |       observed_impacts.csv
+|   |       physical_model_metrics.csv
+|   |       physical_model_validation.csv
+|   |       report.md
+|   |       service_results.csv
+|   |       service_routes.csv
+|   |       topology_after.png
+|   |       topology_before.png
+|   |       topology_nominal.png
+|   |       
+|   +---experiments
+|   |   +---dust_sweep_isolated
+|   |   |       experiment_report.md
+|   |   |       runs.csv
+|   |   |       summary.csv
+|   |   |       
+|   |   \---healing_ablation
+|   |       |   experiment_report.md
+|   |       |   runs.csv
+|   |       |   summary.csv
+|   |       |   
+|   |       +---plots
+|   |       |       indicator_pass_count_bar.png
+|   |       |       science_interruption_bar.png
+|   |       |       
+|   |       +---_runs
+|   |       |   +---0
+|   |       |   +---1
+|   |       |   +---2
+|   |       |   +---3
+|   |       |   \---4
+|   |       \---_scenarios
+|   |               scenario_0.yaml
+|   |               scenario_1.yaml
+|   |               scenario_2.yaml
+|   |               scenario_3.yaml
+|   |               scenario_4.yaml
+|   |               
+|   +---final_demo
+|   |   +---demo_run
+|   |   |       fault_events.csv
+|   |   |       fault_propagation_comparison.csv
+|   |   |       fault_propagation_metrics.csv
+|   |   |       fault_propagation_predictions.csv
+|   |   |       healing_actions.csv
+|   |   |       indicator_check.csv
+|   |   |       metrics_summary.csv
+|   |   |       observed_impacts.csv
+|   |   |       physical_model_metrics.csv
+|   |   |       physical_model_validation.csv
+|   |   |       report.md
+|   |   |       service_results.csv
+|   |   |       service_routes.csv
+|   |   |       topology_after.png
+|   |   |       topology_before.png
+|   |   |       topology_nominal.png
+|   |   |       
+|   |   \---experiments
+|   |       +---dust_sweep_isolated
+|   |       |       experiment_report.md
+|   |       |       runs.csv
+|   |       |       summary.csv
+|   |       |       
+|   |       +---healing_ablation
+|   |       |   |   experiment_report.md
+|   |       |   |   runs.csv
+|   |       |   |   summary.csv
+|   |       |   |   
+|   |       |   \---plots
+|   |       |           indicator_pass_count_bar.png
+|   |       |           science_interruption_bar.png
+|   |       |           
+|   |       +---main_hub_monte_carlo_fast
+|   |       |   |   experiment_report.md
+|   |       |   |   monte_carlo_summary.csv
+|   |       |   |   runs.csv
+|   |       |   |   summary.csv
+|   |       |   |   
+|   |       |   \---plots
+|   |       |           route_convergence_hist.png
+|   |       |           subnet_paralysis_hist.png
+|   |       |           
+|   |       \---relay_handover_sweep
+|   |           |   experiment_report.md
+|   |           |   runs.csv
+|   |           |   summary.csv
+|   |           |   
+|   |           \---plots
+|   |                   handover_vs_delay_disturbance.png
+|   |                   
+|   \---manual_test_step2
+|           fault_events.csv
+|           fault_propagation_comparison.csv
+|           fault_propagation_metrics.csv
+|           fault_propagation_predictions.csv
+|           healing_actions.csv
+|           indicator_check.csv
+|           metrics_summary.csv
+|           observed_impacts.csv
+|           physical_model_metrics.csv
+|           physical_model_validation.csv
+|           report.md
+|           service_results.csv
+|           service_routes.csv
+|           topology_after.png
+|           topology_before.png
+|           topology_nominal.png
+|           
++---scripts
+|   |   generate_final_delivery_docs.py
+|   |   package_final_delivery.ps1
+|   |   run_all_demo.bat
+|   |   run_demo.bat
+|   |   run_final_acceptance.bat
+|   |   setup_env_windows.bat
+|   |   verify_delivery_package.py
+|   |   
+|   \---__pycache__
+|           generate_final_delivery_docs.cpython-311.pyc
+|           generate_final_delivery_docs.cpython-313.pyc
+|           verify_delivery_package.cpython-311.pyc
+|           verify_delivery_package.cpython-313.pyc
+|           
+\---tests
+    |   test_baseline_files_exist.py
+    |   test_before_healing_does_not_auto_reroute.py
+    |   test_config_drives_results.py
+    |   test_dashboard_final_demo_fallback.py
+    |   test_dashboard_localization.py
+    |   test_dashboard_smoke.py
+    |   test_dust_reference_curve_monotonic.py
+    |   test_dust_sweep_isolated.py
+    |   test_experiment_configs_load.py
+    |   test_fault_changes_state.py
+    |   test_final_delivery_files.py
+    |   test_final_docs_use_final_demo.py
+    |   test_healing_ablation.py
+    |   test_healing_effect.py
+    |   test_indicator_applicability.py
+    |   test_indicator_status_fields.py
+    |   test_ka_availability_definitions.py
+    |   test_metrics.py
+    |   test_missing_baseline_file_fails_loudly.py
+    |   test_monte_carlo_reproducible.py
+    |   test_monte_carlo_summary_ci.py
+    |   test_mvp_run.py
+    |   test_no_hardcoded_pass.py
+    |   test_package_script_references_data.py
+    |   test_physical_model_can_fail.py
+    |   test_physical_model_outputs.py
+    |   test_propagation_accuracy_degrades_with_wrong_graph.py
+    |   test_propagation_config_load.py
+    |   test_propagation_delay_not_trivially_zero.py
+    |   test_propagation_metrics_not_benchmark.py
+    |   test_propagation_observation_model_config_drives_delay_error.py
+    |   test_propagation_prediction_outputs.py
+    |   test_reroute_strategy_controls_recovery.py
+    |   test_scenario_load.py
+    |   test_scenario_mutator.py
+    |   test_service_routes_export.py
+    |   test_small_monte_carlo.py
+    |   test_stochastic_link_sampling.py
+    |   test_summary_nonfinite_handling.py
+    |   test_sweep_outputs.py
+    |   test_topology.py
+    |   test_verify_delivery_package.py
+    |   
+    \---__pycache__
+            test_baseline_files_exist.cpython-311-pytest-9.1.1.pyc
+            test_baseline_files_exist.cpython-313-pytest-8.3.4.pyc
+            test_baseline_files_exist.cpython-313.pyc
+            test_before_healing_does_not_auto_reroute.cpython-311-pytest-9.1.1.pyc
+            test_before_healing_does_not_auto_reroute.cpython-313-pytest-8.3.4.pyc
+            test_before_healing_does_not_auto_reroute.cpython-313.pyc
+            test_config_drives_results.cpython-311-pytest-9.1.1.pyc
+            test_config_drives_results.cpython-313-pytest-8.3.4.pyc
+            test_config_drives_results.cpython-313.pyc
+            test_dashboard_final_demo_fallback.cpython-311-pytest-9.1.1.pyc
+            test_dashboard_final_demo_fallback.cpython-313-pytest-8.3.4.pyc
+            test_dashboard_final_demo_fallback.cpython-313.pyc
+            test_dashboard_localization.cpython-311-pytest-9.1.1.pyc
+            test_dashboard_localization.cpython-313-pytest-8.3.4.pyc
+            test_dashboard_localization.cpython-313.pyc
+            test_dashboard_smoke.cpython-311-pytest-9.1.1.pyc
+            test_dashboard_smoke.cpython-313-pytest-8.3.4.pyc
+            test_dashboard_smoke.cpython-313.pyc
+            test_dust_reference_curve_monotonic.cpython-311-pytest-9.1.1.pyc
+            test_dust_reference_curve_monotonic.cpython-313-pytest-8.3.4.pyc
+            test_dust_reference_curve_monotonic.cpython-313.pyc
+            test_dust_sweep_isolated.cpython-311-pytest-9.1.1.pyc
+            test_dust_sweep_isolated.cpython-313-pytest-8.3.4.pyc
+            test_dust_sweep_isolated.cpython-313.pyc
+            test_experiment_configs_load.cpython-311-pytest-9.1.1.pyc
+            test_experiment_configs_load.cpython-313-pytest-8.3.4.pyc
+            test_experiment_configs_load.cpython-313.pyc
+            test_fault_changes_state.cpython-311-pytest-9.1.1.pyc
+            test_fault_changes_state.cpython-313-pytest-8.3.4.pyc
+            test_fault_changes_state.cpython-313.pyc
+            test_final_delivery_files.cpython-311-pytest-9.1.1.pyc
+            test_final_delivery_files.cpython-313-pytest-8.3.4.pyc
+            test_final_delivery_files.cpython-313.pyc
+            test_final_docs_use_final_demo.cpython-311-pytest-9.1.1.pyc
+            test_final_docs_use_final_demo.cpython-313-pytest-8.3.4.pyc
+            test_final_docs_use_final_demo.cpython-313.pyc
+            test_healing_ablation.cpython-311-pytest-9.1.1.pyc
+            test_healing_ablation.cpython-313-pytest-8.3.4.pyc
+            test_healing_ablation.cpython-313.pyc
+            test_healing_effect.cpython-311-pytest-9.1.1.pyc
+            test_healing_effect.cpython-313-pytest-8.3.4.pyc
+            test_healing_effect.cpython-313.pyc
+            test_indicator_applicability.cpython-311-pytest-9.1.1.pyc
+            test_indicator_applicability.cpython-313-pytest-8.3.4.pyc
+            test_indicator_applicability.cpython-313.pyc
+            test_indicator_status_fields.cpython-311-pytest-9.1.1.pyc
+            test_indicator_status_fields.cpython-313-pytest-8.3.4.pyc
+            test_indicator_status_fields.cpython-313.pyc
+            test_ka_availability_definitions.cpython-311-pytest-9.1.1.pyc
+            test_ka_availability_definitions.cpython-313-pytest-8.3.4.pyc
+            test_ka_availability_definitions.cpython-313.pyc
+            test_metrics.cpython-311-pytest-9.1.1.pyc
+            test_metrics.cpython-313-pytest-8.3.4.pyc
+            test_metrics.cpython-313.pyc
+            test_missing_baseline_file_fails_loudly.cpython-311-pytest-9.1.1.pyc
+            test_missing_baseline_file_fails_loudly.cpython-313-pytest-8.3.4.pyc
+            test_missing_baseline_file_fails_loudly.cpython-313.pyc
+            test_monte_carlo_reproducible.cpython-311-pytest-9.1.1.pyc
+            test_monte_carlo_reproducible.cpython-313-pytest-8.3.4.pyc
+            test_monte_carlo_reproducible.cpython-313.pyc
+            test_monte_carlo_summary_ci.cpython-311-pytest-9.1.1.pyc
+            test_monte_carlo_summary_ci.cpython-313-pytest-8.3.4.pyc
+            test_monte_carlo_summary_ci.cpython-313.pyc
+            test_mvp_run.cpython-311-pytest-9.1.1.pyc
+            test_mvp_run.cpython-313-pytest-8.3.4.pyc
+            test_mvp_run.cpython-313.pyc
+            test_no_hardcoded_pass.cpython-311-pytest-9.1.1.pyc
+            test_no_hardcoded_pass.cpython-313-pytest-8.3.4.pyc
+            test_no_hardcoded_pass.cpython-313.pyc
+            test_package_script_references_data.cpython-311-pytest-9.1.1.pyc
+            test_package_script_references_data.cpython-313-pytest-8.3.4.pyc
+            test_package_script_references_data.cpython-313.pyc
+            test_physical_model_can_fail.cpython-311-pytest-9.1.1.pyc
+            test_physical_model_can_fail.cpython-313-pytest-8.3.4.pyc
+            test_physical_model_can_fail.cpython-313.pyc
+            test_physical_model_outputs.cpython-311-pytest-9.1.1.pyc
+            test_physical_model_outputs.cpython-313-pytest-8.3.4.pyc
+            test_physical_model_outputs.cpython-313.pyc
+            test_propagation_accuracy_degrades_with_wrong_graph.cpython-311-pytest-9.1.1.pyc
+            test_propagation_accuracy_degrades_with_wrong_graph.cpython-313-pytest-8.3.4.pyc
+            test_propagation_accuracy_degrades_with_wrong_graph.cpython-313.pyc
+            test_propagation_config_load.cpython-311-pytest-9.1.1.pyc
+            test_propagation_config_load.cpython-313-pytest-8.3.4.pyc
+            test_propagation_config_load.cpython-313.pyc
+            test_propagation_delay_not_trivially_zero.cpython-311-pytest-9.1.1.pyc
+            test_propagation_delay_not_trivially_zero.cpython-313-pytest-8.3.4.pyc
+            test_propagation_delay_not_trivially_zero.cpython-313.pyc
+            test_propagation_metrics_not_benchmark.cpython-311-pytest-9.1.1.pyc
+            test_propagation_metrics_not_benchmark.cpython-313-pytest-8.3.4.pyc
+            test_propagation_metrics_not_benchmark.cpython-313.pyc
+            test_propagation_observation_model_config_drives_delay_error.cpython-311-pytest-9.1.1.pyc
+            test_propagation_observation_model_config_drives_delay_error.cpython-313-pytest-8.3.4.pyc
+            test_propagation_observation_model_config_drives_delay_error.cpython-313.pyc
+            test_propagation_prediction_outputs.cpython-311-pytest-9.1.1.pyc
+            test_propagation_prediction_outputs.cpython-313-pytest-8.3.4.pyc
+            test_propagation_prediction_outputs.cpython-313.pyc
+            test_reroute_strategy_controls_recovery.cpython-311-pytest-9.1.1.pyc
+            test_reroute_strategy_controls_recovery.cpython-313-pytest-8.3.4.pyc
+            test_reroute_strategy_controls_recovery.cpython-313.pyc
+            test_scenario_load.cpython-311-pytest-9.1.1.pyc
+            test_scenario_load.cpython-313-pytest-8.3.4.pyc
+            test_scenario_load.cpython-313.pyc
+            test_scenario_mutator.cpython-311-pytest-9.1.1.pyc
+            test_scenario_mutator.cpython-313-pytest-8.3.4.pyc
+            test_scenario_mutator.cpython-313.pyc
+            test_service_routes_export.cpython-311-pytest-9.1.1.pyc
+            test_service_routes_export.cpython-313-pytest-8.3.4.pyc
+            test_service_routes_export.cpython-313.pyc
+            test_small_monte_carlo.cpython-311-pytest-9.1.1.pyc
+            test_small_monte_carlo.cpython-313-pytest-8.3.4.pyc
+            test_small_monte_carlo.cpython-313.pyc
+            test_stochastic_link_sampling.cpython-311-pytest-9.1.1.pyc
+            test_stochastic_link_sampling.cpython-313-pytest-8.3.4.pyc
+            test_stochastic_link_sampling.cpython-313.pyc
+            test_summary_nonfinite_handling.cpython-311-pytest-9.1.1.pyc
+            test_summary_nonfinite_handling.cpython-313-pytest-8.3.4.pyc
+            test_summary_nonfinite_handling.cpython-313.pyc
+            test_sweep_outputs.cpython-311-pytest-9.1.1.pyc
+            test_sweep_outputs.cpython-313-pytest-8.3.4.pyc
+            test_sweep_outputs.cpython-313.pyc
+            test_topology.cpython-311-pytest-9.1.1.pyc
+            test_topology.cpython-313-pytest-8.3.4.pyc
+            test_topology.cpython-313.pyc
+            test_verify_delivery_package.cpython-311-pytest-9.1.1.pyc
+            test_verify_delivery_package.cpython-313-pytest-8.3.4.pyc
+            test_verify_delivery_package.cpython-313.pyc
+            

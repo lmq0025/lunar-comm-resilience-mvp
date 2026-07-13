@@ -1,0 +1,11 @@
+experiment:
+  name: dust_sweep_full_mission
+  type: sweep
+  purpose: Show lunar dust impact under the full default mission fault set.
+parameter:
+  name: dust_level
+  values: [0.0, 0.1, 0.2, 0.35, 0.5, 0.7, 0.9]
+output_metrics:
+  - video_return_success_rate
+  - control_command_loss_rate
+  - science_data_interruption_s
