@@ -1,0 +1,10 @@
+predicted_effect,observed,true_positive,false_positive,false_negative,predicted_delay_ms,observed_delay_ms,delay_error_pct
+congestion_increase,True,True,False,False,10.0,10.14,1.3806706114398477
+end_to_end_delay_increase,True,True,False,False,20.0,20.28,1.3806706114398477
+packet_loss_increase,True,True,False,False,10.0,10.06,0.5964214711729672
+route_invalid,True,True,False,False,10.0,10.120000000000001,1.1857707509881519
+science_data_interruption,True,True,False,False,45.0,45.81,1.768172888015722
+service_qos_drop,True,True,False,False,30.0,30.72,2.3437499999999964
+service_unreachable,True,True,False,False,25.0,25.45,1.7681728880157142
+snr_degradation,True,True,False,False,5.0,5.03,0.5964214711729672
+video_return_failure,True,True,False,False,55.0,56.32,2.3437500000000004

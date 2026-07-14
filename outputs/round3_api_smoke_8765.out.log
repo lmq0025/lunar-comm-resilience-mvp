@@ -1,0 +1,5 @@
+API: http://127.0.0.1:8765
+Swagger: http://127.0.0.1:8765/docs
+INFO:     127.0.0.1:47199 - "GET /api/v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47199 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47199 - "GET /openapi.json HTTP/1.1" 200 OK

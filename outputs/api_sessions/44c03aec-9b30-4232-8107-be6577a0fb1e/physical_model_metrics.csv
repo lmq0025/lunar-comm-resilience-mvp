@@ -1,0 +1,7 @@
+metric,value,method
+rf_lifetime_prediction_error_pct,3.9060287178272883,MVP physical model compared with packaged reference CSV
+dust_gain_loss_quantification_error_pct,3.0000000000000044,MVP physical model compared with packaged reference CSV
+predicted_rf_lifetime_h,76418.73066214785,MVP physical model compared with packaged reference CSV
+reference_rf_lifetime_h,79525.0,MVP physical model compared with packaged reference CSV
+predicted_gain_loss_db,0.97776,MVP physical model compared with packaged reference CSV
+reference_gain_loss_db,1.008,MVP physical model compared with packaged reference CSV

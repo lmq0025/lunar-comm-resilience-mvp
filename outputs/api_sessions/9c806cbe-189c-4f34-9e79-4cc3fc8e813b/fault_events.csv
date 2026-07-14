@@ -1,0 +1,5 @@
+fault_id,fault_type,target,start_s,duration_s,severity,applied_effect
+F6,main_hub_failure,lander_main_hub,30,25,0.95,primary hub disabled; backup paths remain available for rerouting
+F3,dust_antenna_degradation,all_rf_links,10,90,0.35,RF links degraded by dust severity
+F7,relay_handover_delay,lunar_orbiter,45,5,0.6,relay handover disturbance set to 120.0 ms
+F8,buffer_overflow,edge_compute,62,12,0.5,congestion multiplier set to 2.20

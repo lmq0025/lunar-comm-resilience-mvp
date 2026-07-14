@@ -1,0 +1,6 @@
+metric,value,method
+cascading_fault_prediction_accuracy,1.0,MVP fault propagation graph prediction compared with simulated observed impacts
+fault_propagation_delay_error_pct,1.4848667435828018,MVP fault propagation graph prediction compared with simulated observed impacts
+propagation_true_positive_count,9.0,MVP fault propagation graph prediction compared with simulated observed impacts
+propagation_false_positive_count,0.0,MVP fault propagation graph prediction compared with simulated observed impacts
+propagation_false_negative_count,0.0,MVP fault propagation graph prediction compared with simulated observed impacts

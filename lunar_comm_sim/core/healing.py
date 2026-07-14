@@ -38,6 +38,15 @@ class HealingActionRecord:
 def apply_healing(graph: nx.Graph, scenario: Scenario) -> tuple[nx.Graph, list[HealingActionRecord]]:
     """Apply configured self-healing strategies to a faulted graph copy."""
 
+    healed = initialize_healing_state(graph, scenario)
+    actions = apply_non_routing_healing(healed, scenario)
+    actions.extend(apply_reroute_healing(healed, scenario))
+    return healed, actions
+
+
+def initialize_healing_state(graph: nx.Graph, scenario: Scenario) -> nx.Graph:
+    """Create an after-healing graph copy with self-healing state containers."""
+
     healed = graph.copy()
     healed.graph["stage"] = "after_healing"
     healed.graph.setdefault("protected_services", {})
@@ -45,21 +54,46 @@ def apply_healing(graph: nx.Graph, scenario: Scenario) -> tuple[nx.Graph, list[H
     healed.graph.setdefault("buffered_services", {})
     healed.graph.setdefault("healing_action_metrics", {})
     healed.graph["pre_healing_invalid_services"] = _invalid_services_from_current_routes(healed, scenario)
-    actions: list[HealingActionRecord] = []
+    healed.graph["pending_route_recalculation"] = is_enabled(scenario, "reroute_backup_path")
+    return healed
 
+
+def apply_non_routing_healing(graph: nx.Graph, scenario: Scenario) -> list[HealingActionRecord]:
+    """Apply enabled healing strategies that do not recompute service routes."""
+
+    actions: list[HealingActionRecord] = []
     for strategy in scenario.healing_enabled:
         if strategy == "reroute_backup_path":
-            actions.append(_reroute_backup_path(healed, scenario))
+            graph.graph["pending_route_recalculation"] = True
         elif strategy == "priority_scheduling":
-            actions.append(_priority_scheduling(healed, scenario))
+            actions.append(_priority_scheduling(graph, scenario))
         elif strategy == "service_degradation":
-            actions.append(_service_degradation(healed, scenario))
+            actions.append(_service_degradation(graph, scenario))
         elif strategy == "store_and_forward":
-            actions.append(_store_and_forward(healed, scenario))
+            actions.append(_store_and_forward(graph, scenario))
         elif strategy == "relay_pre_handover":
-            actions.append(_relay_pre_handover(healed, scenario))
+            actions.append(_relay_pre_handover(graph, scenario))
+    return actions
 
-    return healed, actions
+
+def apply_reroute_healing(graph: nx.Graph, scenario: Scenario) -> list[HealingActionRecord]:
+    """Apply route recomputation when the reroute strategy is enabled."""
+
+    if not is_enabled(scenario, "reroute_backup_path"):
+        graph.graph["service_routes"] = build_routing_table(
+            graph,
+            scenario,
+            recompute=False,
+            inherited_routes=graph.graph.get("service_routes", {}),
+            route_source="healing_verified_inherited",
+        )
+        graph.graph["pending_route_recalculation"] = False
+        graph.graph["reroute_success"] = False
+        return []
+
+    action = _reroute_backup_path(graph, scenario)
+    graph.graph["pending_route_recalculation"] = False
+    return [action]
 
 
 def healing_actions_as_rows(actions: list[HealingActionRecord]) -> list[dict[str, object]]:

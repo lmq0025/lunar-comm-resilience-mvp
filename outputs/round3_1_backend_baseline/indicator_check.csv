@@ -1,0 +1,15 @@
+id,indicator,layer,metric,operator,threshold,actual,unit,applicable,status,not_applicable_reason,passed,verification_method
+rf_lifetime_prediction_error,RF lifetime prediction error,physical,rf_lifetime_prediction_error_pct,<=,10.0,3.9060287178272883,%,True,passed,,True,MVP physical model compared with internal replaceable reference curve
+dust_gain_loss_error,Lunar dust antenna gain loss quantification error,physical,dust_gain_loss_quantification_error_pct,<=,5.0,3.0000000000000044,%,True,passed,,True,MVP physical model compared with internal replaceable reference curve
+main_hub_subnet_paralysis,Main-hub failure subnet paralysis probability,network,subnet_paralysis_probability,<=,0.01,0.0,ratio,True,passed,,True,MVP topology and service reachability simulation
+relay_handover_disturbance,Relay handover end-to-end delay disturbance,network,relay_handover_delay_disturbance_ms,<=,50.0,35.0,ms,True,passed,,True,MVP handover fault and healing model
+ka_channel_availability,Ka-band channel availability,physical,ka_channel_availability,>=,0.995,0.9982700000000001,ratio,True,passed,,True,MVP link model
+route_convergence,Route convergence time,network,route_convergence_time_ms,<=,50.0,35.0,ms,True,passed,,True,reroute_backup_path healing action
+urllc_command_loss,URLLC command packet loss rate,service,control_command_loss_rate,<=,1e-05,9.804126360011267e-06,ratio,True,passed,,True,MVP service simulation
+hd_video_success,HD video return success rate,service,video_return_success_rate,>=,0.999,0.9999447319008038,ratio,True,passed,,True,MVP service simulation with degradation policy
+fault_library_coverage,Fault-mode library coverage,fault,fault_mode_library_coverage,>=,8.0,10.0,count,True,passed,,True,coded fault library
+cascading_fault_prediction_accuracy,Cascading fault prediction accuracy,fault,cascading_fault_prediction_accuracy,>=,0.9,1.0,ratio,True,passed,,True,MVP fault propagation graph prediction compared with simulated observed impacts
+fault_propagation_delay_error,Fault propagation delay quantification error,fault,fault_propagation_delay_error_pct,<=,15.0,1.4848667435828018,%,True,passed,,True,MVP fault propagation graph prediction compared with simulated observed impacts
+service_degradation_decision,Service degradation decision time,service,service_degradation_decision_ms,<=,200.0,120.0,ms,True,passed,,True,service_degradation healing action
+resource_contention_resolution,Resource contention resolution rate,service,resource_contention_resolution_rate,>=,0.95,1.0,ratio,True,passed,,True,protected congested-service scheduling result
+science_data_interruption,Science data return interruption,service,science_data_interruption_s,<=,1.0,0.45499999999999996,s,True,passed,,True,store-and-forward simulation

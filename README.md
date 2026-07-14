@@ -85,6 +85,52 @@ streamlit run lunar_comm_sim/app/dashboard.py
 
 The Dashboard reads `outputs/final_demo/demo_run` by default. If it does not exist, it falls back to `outputs/demo_run`. Batch experiment tabs read `outputs/final_demo/experiments` by default and fall back to `outputs/experiments`.
 
+## Complete Software Backend API
+
+Start the staged FastAPI backend:
+
+```powershell
+scripts\run_api.bat
+```
+
+Swagger and health-check URLs:
+
+- `http://127.0.0.1:8000/docs`
+- `http://127.0.0.1:8000/redoc`
+- `http://127.0.0.1:8000/api/v1/health`
+
+The backend exposes nine ordered simulation-step endpoints under `/api/v1/sessions/{session_id}/steps/...`. Session state is currently kept in process memory only.
+
+## Complete Software Frontend
+
+Round 4 adds the first five staged workflow steps in the React frontend: topology build, route calculation, nominal simulation, fault injection, and before-healing fault impact analysis.
+
+Install frontend dependencies:
+
+```powershell
+scripts\install_frontend.bat
+```
+
+Start backend and frontend for local development:
+
+```powershell
+scripts\run_platform_dev.bat
+```
+
+Custom ports are supported:
+
+```powershell
+scripts\run_platform_dev.bat 8765 5174
+```
+
+This maps the API to `http://127.0.0.1:8765` and the frontend to `http://127.0.0.1:5174`, with `VITE_API_BASE_URL` passed to the frontend automatically.
+
+Frontend URL:
+
+- `http://127.0.0.1:5173`
+
+The frontend currently stores projects in browser `localStorage`, supports YAML/JSON import and export, validates scenarios through the FastAPI backend, configures services and faults, and runs the backend-driven first five staged steps. Healing execution, post-healing route recalculation, after-healing simulation, final indicator verification, and batch experiment pages remain reserved for later development rounds.
+
 ## Final Acceptance
 
 ```bat

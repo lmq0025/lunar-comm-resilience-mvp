@@ -1,0 +1,7 @@
+Frontend: http://127.0.0.1:5174
+API base: http://127.0.0.1:8765/api/v1
+
+> lunar-comm-resilience-frontend@0.2.0 dev
+> node scripts/dev.mjs
+
+  ➜  Local:   http://127.0.0.1:5174/

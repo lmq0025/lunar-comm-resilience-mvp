@@ -1,0 +1,10 @@
+observed_effect,observed_layer,source,observed_delay_ms,evidence
+route_invalid,network,service_routes,10.120000000000001,before_healing route_valid=false
+service_unreachable,service,service_results,25.45,before_healing service reachable=false
+snr_degradation,physical,metrics,5.03,before_healing snr_db below nominal
+packet_loss_increase,physical,metrics,10.06,before_healing packet_loss_rate above nominal
+end_to_end_delay_increase,network,metrics,20.28,handover disturbance or delay increase observed
+congestion_increase,network,metrics,10.14,before_healing congestion_rate above nominal
+service_qos_drop,service,service_results,30.72,before_healing service success_rate below 0.999
+science_data_interruption,service,service_results,45.81,science_data interruption_s > 0
+video_return_failure,service,service_results,56.32,hd_video success_rate below target

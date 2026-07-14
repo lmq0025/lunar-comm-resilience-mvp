@@ -40,14 +40,21 @@ def build_topology(scenario: Scenario) -> nx.Graph:
     for node in scenario.nodes:
         graph.add_node(
             node.id,
+            name=node.name,
             type=node.type,
             role=node.role,
-            active=True,
-            availability=1.0,
+            active=bool(node.active),
+            availability=float(node.availability),
+            node_processing_delay_ms=float(node.node_processing_delay_ms),
+            position_x=node.position_x,
+            position_y=node.position_y,
         )
 
     for link in scenario.links:
+        link_id = link.id or stable_link_id(link.source, link.target)
         attrs = {
+            "id": link_id,
+            "name": link.name,
             "kind": link.kind,
             "bandwidth_mbps": float(link.bandwidth_mbps),
             "base_bandwidth_mbps": float(link.bandwidth_mbps),
@@ -63,6 +70,13 @@ def build_topology(scenario: Scenario) -> nx.Graph:
         graph.add_edge(link.source, link.target, **attrs)
 
     return graph
+
+
+def stable_link_id(source: str, target: str) -> str:
+    """Return a stable ID for an undirected link."""
+
+    left, right = sorted([source, target])
+    return f"link__{left}__{right}"
 
 
 def active_subgraph(graph: nx.Graph) -> nx.Graph:

@@ -1,0 +1,3 @@
+model,input_temperature_c,input_radiation_level,input_dust_level,predicted_value,reference_value,error_pct,target_error_pct,passed,reference_source,verification_method
+rf_lifetime,-45.0,0.3,,76418.73066214785,79525.0,3.9060287178272883,10.0,True,E:/LunarCommMVP/lunar-comm-resilience-mvp/data/baselines/rf_lifetime_reference.csv,MVP physical model compared with packaged reference CSV
+dust_gain,,,0.35,0.97776,1.008,3.0000000000000044,5.0,True,E:/LunarCommMVP/lunar-comm-resilience-mvp/data/baselines/dust_gain_reference.csv,MVP physical model compared with packaged reference CSV

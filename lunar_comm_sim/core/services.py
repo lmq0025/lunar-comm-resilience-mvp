@@ -200,6 +200,8 @@ def _configured_outage_s(scenario: Scenario) -> float:
     durations = [
         float(fault.duration_s)
         for fault in scenario.faults
-        if fault.type in scenario.faults_enabled and fault.type in {"main_hub_failure", "terrain_obstruction", "relay_handover_delay"}
+        if fault.enabled
+        and fault.type in scenario.faults_enabled
+        and fault.type in {"main_hub_failure", "terrain_obstruction", "relay_handover_delay"}
     ]
     return max(durations, default=0.0)

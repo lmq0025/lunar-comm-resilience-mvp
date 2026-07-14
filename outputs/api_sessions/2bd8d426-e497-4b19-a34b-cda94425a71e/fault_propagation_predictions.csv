@@ -1,0 +1,10 @@
+root_fault,predicted_effect,predicted_layer,predicted_probability,predicted_delay_ms,propagation_path,confidence
+main_hub_failure,service_unreachable,service,0.9309999999999999,25.0,main_hub_failure -> route_invalid -> service_unreachable,0.9309999999999999
+main_hub_failure,route_invalid,network,0.98,10.0,main_hub_failure -> route_invalid,0.98
+main_hub_failure,science_data_interruption,service,0.7448,45.0,main_hub_failure -> route_invalid -> service_unreachable -> science_data_interruption,0.7448
+dust_antenna_degradation,snr_degradation,physical,0.9,5.0,dust_antenna_degradation -> snr_degradation,0.9
+dust_antenna_degradation,packet_loss_increase,physical,0.765,10.0,dust_antenna_degradation -> snr_degradation -> packet_loss_increase,0.765
+relay_handover_delay,end_to_end_delay_increase,network,0.95,20.0,relay_handover_delay -> end_to_end_delay_increase,0.95
+buffer_overflow,congestion_increase,network,0.9,10.0,buffer_overflow -> congestion_increase,0.9
+buffer_overflow,video_return_failure,service,0.54,55.0,buffer_overflow -> congestion_increase -> service_qos_drop -> video_return_failure,0.54
+buffer_overflow,service_qos_drop,service,0.7200000000000001,30.0,buffer_overflow -> congestion_increase -> service_qos_drop,0.7200000000000001

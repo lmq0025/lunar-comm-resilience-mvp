@@ -42,6 +42,8 @@ def apply_faults(graph: nx.Graph, scenario: Scenario) -> tuple[nx.Graph, list[Fa
     records: list[FaultEventRecord] = []
 
     for fault in scenario.faults:
+        if not fault.enabled:
+            continue
         if fault.type not in scenario.faults_enabled:
             continue
         effect = _apply_single_fault(faulted, scenario, fault)
