@@ -10,9 +10,14 @@ export type {
   LinkPayload,
   NodePayload,
   AnalyzeFaultImpactStepResponse,
+  ArtifactItemResponse,
+  ArtifactManifestResponse,
   BuildTopologyStepResponse,
   CalculateRoutesStepResponse,
+  ExecuteHealingStepResponse,
   GraphSnapshotResponse,
+  HealingActionResponse,
+  IndicatorCheckResponse,
   InjectFaultsStepResponse,
   JsonSafeNumber,
   JsonSafeOptionalNumber,
@@ -25,7 +30,9 @@ export type {
   PropagationComparisonResponse,
   PropagationMetricsResponse,
   PropagationPredictionResponse,
+  RecalculateRoutesStepResponse,
   RouteSnapshotItemResponse,
+  RunAfterHealingStepResponse,
   RunNominalStepResponse,
   ScenarioPayload,
   ScenarioValidationResponse,
@@ -35,5 +42,6 @@ export type {
   ServicePayload,
   StepResponse,
   TechnicalIndicatorPayload,
-  ValidationIssueResponse
+  ValidationIssueResponse,
+  VerifyIndicatorsStepResponse
 } from "./generated/openapi";

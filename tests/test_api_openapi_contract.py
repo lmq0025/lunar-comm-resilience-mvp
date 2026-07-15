@@ -29,6 +29,10 @@ def test_step_success_responses_use_step_response() -> None:
             "run-nominal": "RunNominalStepResponse",
             "inject-faults": "InjectFaultsStepResponse",
             "analyze-fault-impact": "AnalyzeFaultImpactStepResponse",
+            "execute-healing": "ExecuteHealingStepResponse",
+            "recalculate-routes": "RecalculateRoutesStepResponse",
+            "run-after-healing": "RunAfterHealingStepResponse",
+            "verify-indicators": "VerifyIndicatorsStepResponse",
         }.get(endpoint, "StepResponse")
         assert _ref_name(response_schema) == expected
 
@@ -50,6 +54,24 @@ def test_round4_step_response_models_are_precise() -> None:
 
     analyze_fault = components["AnalyzeFaultImpactStepResultResponse"]["properties"]
     assert analyze_fault["fault_impact"]["$ref"].endswith("/FaultImpactSummaryResponse")
+
+
+def test_round5_step_response_models_are_precise() -> None:
+    schema = client().get("/openapi.json").json()
+    components = schema["components"]["schemas"]
+    assert "HealingActionResponse" in components
+    assert "IndicatorCheckResponse" in components
+
+    step6 = components["ExecuteHealingStepResultResponse"]["properties"]
+    assert step6["healing_actions"]["items"]["$ref"].endswith("/HealingActionResponse")
+    assert step6["routes"]["additionalProperties"]["$ref"].endswith("/RouteSnapshotItemResponse")
+
+    step8 = components["RunAfterHealingStepResultResponse"]["properties"]
+    assert step8["services"]["items"]["$ref"].endswith("/ServiceSimulationResultResponse")
+
+    step9 = components["VerifyIndicatorsStepResultResponse"]["properties"]
+    assert step9["indicators"]["items"]["$ref"].endswith("/IndicatorCheckResponse")
+    assert step9["artifacts"]["items"]["$ref"].endswith("/ArtifactItemResponse")
 
 
 def test_get_session_response_uses_session_summary_response() -> None:

@@ -111,6 +111,10 @@ export interface CatalogItemResponse {
   display_name_zh?: string | null;
   description_zh?: string | null;
   target_scope?: string | null;
+  execution_step?: number | null;
+  strategy_category?: string | null;
+  target_summary_zh?: string | null;
+  preconditions_zh?: string | null;
   implementation_status?: string | null;
   implemented_effect?: string | null;
   name_zh?: string | null;
@@ -355,3 +359,81 @@ export interface AnalyzeFaultImpactStepResultResponse {
 }
 
 export type AnalyzeFaultImpactStepResponse = StepResponse<AnalyzeFaultImpactStepResultResponse>;
+
+export interface HealingActionResponse {
+  time_s: number;
+  strategy: string;
+  target: string;
+  action: string;
+  success: boolean;
+  measured_response_ms: JsonSafeNumber;
+  notes: string;
+}
+
+export interface ExecuteHealingStepResultResponse {
+  healing_actions: HealingActionResponse[];
+  pending_route_recalculation: boolean;
+  routes: Record<string, RouteSnapshotItemResponse>;
+  topology: GraphSnapshotResponse;
+}
+
+export type ExecuteHealingStepResponse = StepResponse<ExecuteHealingStepResultResponse>;
+
+export interface RecalculateRoutesStepResultResponse {
+  healing_actions: HealingActionResponse[];
+  pending_route_recalculation: boolean;
+  routes: Record<string, RouteSnapshotItemResponse>;
+  topology: GraphSnapshotResponse;
+}
+
+export type RecalculateRoutesStepResponse = StepResponse<RecalculateRoutesStepResultResponse>;
+
+export interface RunAfterHealingStepResultResponse {
+  services: ServiceSimulationResultResponse[];
+  metrics: MetricRowResponse[];
+  topology: GraphSnapshotResponse;
+  healing_actions: HealingActionResponse[];
+  routes: Record<string, RouteSnapshotItemResponse>;
+}
+
+export type RunAfterHealingStepResponse = StepResponse<RunAfterHealingStepResultResponse>;
+
+export interface IndicatorCheckResponse {
+  id: string;
+  indicator: string;
+  layer: string;
+  metric: string;
+  operator: "<=" | ">=";
+  threshold: number;
+  actual: JsonSafeNumber;
+  unit: string;
+  applicable: boolean;
+  status: "passed" | "failed" | "not_applicable";
+  not_applicable_reason: string;
+  passed: boolean;
+  verification_method: string;
+}
+
+export interface ArtifactItemResponse {
+  filename: string;
+  relative_path: string;
+  exists: boolean;
+  size_bytes: number;
+  file_type?: string | null;
+  purpose_zh?: string | null;
+}
+
+export interface ArtifactManifestResponse {
+  artifacts: ArtifactItemResponse[];
+}
+
+export interface VerifyIndicatorsStepResultResponse {
+  indicators: IndicatorCheckResponse[];
+  applicable_count: number;
+  passed_count: number;
+  failed_count: number;
+  not_applicable_count: number;
+  artifacts: ArtifactItemResponse[];
+}
+
+export type VerifyIndicatorsStepResponse = StepResponse<VerifyIndicatorsStepResultResponse>;

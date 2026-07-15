@@ -425,7 +425,7 @@ body {
 .stage-topology-legend {
   position: absolute;
   left: 10px;
-  bottom: 10px;
+  bottom: 52px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -434,6 +434,20 @@ body {
   border-radius: 6px;
   background: rgb(255 255 255 / 92%);
   color: #33424d;
+  font-size: 12px;
+  z-index: 5;
+}
+
+.stage-topology-note {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  padding: 6px 8px;
+  border: 1px solid #f0d5a8;
+  border-radius: 6px;
+  background: rgb(255 251 230 / 94%);
+  color: #5c3b00;
   font-size: 12px;
   z-index: 5;
 }
@@ -465,4 +479,10 @@ body {
 
 .clickable-tag {
   cursor: pointer;
+}
+
+.healing-strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
 }

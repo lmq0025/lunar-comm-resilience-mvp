@@ -15,6 +15,7 @@ import {
 import { App, Button, Layout, Menu, Space, Tag, Tooltip, Typography } from "antd";
 import { useHealthQuery } from "../api/health";
 import { SaveAsProjectModal } from "../components/SaveAsProjectModal";
+import { HealingStrategyPage } from "../pages/HealingStrategyPage";
 import { ProjectManagerPage } from "../pages/ProjectManagerPage";
 import { ServiceRoutingPage } from "../pages/ServiceRoutingPage";
 import { SimulationRunPage } from "../pages/SimulationRunPage";
@@ -118,7 +119,7 @@ export function AppLayout() {
               { key: "topology", icon: <ShareAltOutlined />, label: "拓扑构建" },
               { key: "services", icon: <ProjectOutlined />, label: "业务配置" },
               { key: "faults", icon: <CloudServerOutlined />, label: "故障注入" },
-              { key: "healing", icon: <SafetyCertificateOutlined />, label: "自愈策略", disabled: true, title: disabledMessage },
+              { key: "healing", icon: <SafetyCertificateOutlined />, label: "自愈策略" },
               { key: "simulation", icon: <PlayCircleOutlined />, label: "仿真运行" },
               { key: "results", icon: <BarChartOutlined />, label: "结果分析" },
               { key: "experiments", icon: <ExperimentOutlined />, label: "批量实验", disabled: true, title: disabledMessage }
@@ -130,6 +131,8 @@ export function AppLayout() {
             <ProjectManagerPage />
           ) : activeMenu === "services" ? (
             <ServiceRoutingPage />
+          ) : activeMenu === "healing" ? (
+            <HealingStrategyPage />
           ) : activeMenu === "faults" || activeMenu === "simulation" || activeMenu === "results" ? (
             <SimulationRunPage />
           ) : (

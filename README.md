@@ -103,7 +103,7 @@ The backend exposes nine ordered simulation-step endpoints under `/api/v1/sessio
 
 ## Complete Software Frontend
 
-Round 4 adds the first five staged workflow steps in the React frontend: topology build, route calculation, nominal simulation, fault injection, and before-healing fault impact analysis.
+Round 5 opens the complete nine-step staged workflow in the React frontend: topology build, route calculation, nominal simulation, fault injection, before-healing impact analysis, non-routing healing execution, backup-route recalculation, after-healing simulation, and final indicator verification with artifact downloads.
 
 Install frontend dependencies:
 
@@ -129,7 +129,9 @@ Frontend URL:
 
 - `http://127.0.0.1:5173`
 
-The frontend currently stores projects in browser `localStorage`, supports YAML/JSON import and export, validates scenarios through the FastAPI backend, configures services and faults, and runs the backend-driven first five staged steps. Healing execution, post-healing route recalculation, after-healing simulation, final indicator verification, and batch experiment pages remain reserved for later development rounds.
+The frontend currently stores projects in browser `localStorage`, supports YAML/JSON import and export, validates scenarios through the FastAPI backend, configures services, faults, and healing strategies, and runs the full backend-driven nine-step loop. Batch experiment pages remain reserved for later development rounds.
+
+Round 5 engineering notes are in `docs/full_software_round5_healing_and_indicator_verification.md`.
 
 ## Final Acceptance
 

@@ -1,6 +1,0 @@
-time_s,strategy,target,action,success,measured_response_ms,notes
-31.0,priority_scheduling,"control_command,teleoperation",reserve bandwidth and loss protection,True,80.0,protected high-priority services
-32.0,service_degradation,hd_video,reduce service bandwidth demand,True,120.0,HD video bitrate reduced to degraded_bandwidth_mbps
-33.0,store_and_forward,science_data,enable buffer and resume forwarding,True,420.0,science data buffered for resume forwarding
-34.0,relay_pre_handover,relay_links,pre-stage handover and reduce disturbance,True,35.0,updated 4 relay links
-30.0,reroute_backup_path,active_topology,recompute active backup paths,True,35.0,rerouted services: 4; failed services: 0

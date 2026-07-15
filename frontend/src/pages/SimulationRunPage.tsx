@@ -1,15 +1,19 @@
 import { useEffect, useMemo } from "react";
-import { App, Alert, Button, Card, Descriptions, Empty, InputNumber, Popconfirm, Select, Slider, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
+import { App, Alert, Button, Card, Descriptions, Empty, InputNumber, Popconfirm, Select, Slider, Space, Switch, Table, Tabs, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { DefaultOptionType } from "antd/es/select";
 import { PlayCircleOutlined, PlusOutlined, SyncOutlined } from "@ant-design/icons";
 import { useCatalogsQuery } from "../api/catalogs";
+import { downloadArtifact, downloadArtifactBundle } from "../api/routing";
 import type {
+  ArtifactItemResponse,
   CatalogItemResponse,
   FaultPayload,
   FaultRecordResponse,
   FaultImpactSummaryResponse,
   GraphSnapshotResponse,
+  HealingActionResponse,
+  IndicatorCheckResponse,
   LinkPayload,
   MetricDeltaResponse,
   MetricRowResponse,
@@ -69,6 +73,10 @@ function SimulationRunContent() {
   const nominalStatus = useServiceRoutingStore((state) => state.nominalStatus);
   const faultInjectionStatus = useServiceRoutingStore((state) => state.faultInjectionStatus);
   const faultImpactStatus = useServiceRoutingStore((state) => state.faultImpactStatus);
+  const healingExecutionStatus = useServiceRoutingStore((state) => state.healingExecutionStatus);
+  const healedRouteStatus = useServiceRoutingStore((state) => state.healedRouteStatus);
+  const afterHealingStatus = useServiceRoutingStore((state) => state.afterHealingStatus);
+  const indicatorVerificationStatus = useServiceRoutingStore((state) => state.indicatorVerificationStatus);
   const sessionId = useServiceRoutingStore((state) => state.sessionId);
   const nominalTopology = useServiceRoutingStore((state) => state.nominalTopology);
   const nominalRoutes = useServiceRoutingStore((state) => state.nominalRoutes);
@@ -82,6 +90,18 @@ function SimulationRunContent() {
   const beforeHealingServices = useServiceRoutingStore((state) => state.beforeHealingServices);
   const beforeHealingMetrics = useServiceRoutingStore((state) => state.beforeHealingMetrics);
   const faultImpact = useServiceRoutingStore((state) => state.faultImpact);
+  const nonRoutingHealingActions = useServiceRoutingStore((state) => state.nonRoutingHealingActions);
+  const allHealingActions = useServiceRoutingStore((state) => state.allHealingActions);
+  const postActionTopology = useServiceRoutingStore((state) => state.postActionTopology);
+  const postActionRoutes = useServiceRoutingStore((state) => state.postActionRoutes);
+  const pendingRouteRecalculation = useServiceRoutingStore((state) => state.pendingRouteRecalculation);
+  const healedTopology = useServiceRoutingStore((state) => state.healedTopology);
+  const healedRoutes = useServiceRoutingStore((state) => state.healedRoutes);
+  const afterHealingServices = useServiceRoutingStore((state) => state.afterHealingServices);
+  const afterHealingMetrics = useServiceRoutingStore((state) => state.afterHealingMetrics);
+  const indicatorChecks = useServiceRoutingStore((state) => state.indicatorChecks);
+  const indicatorSummary = useServiceRoutingStore((state) => state.indicatorSummary);
+  const artifacts = useServiceRoutingStore((state) => state.artifacts);
   const selectedStage = useServiceRoutingStore((state) => state.selectedStage);
   const selectedServiceId = useServiceRoutingStore((state) => state.selectedServiceId);
   const selectedFaultId = useServiceRoutingStore((state) => state.selectedFaultId);
@@ -93,6 +113,10 @@ function SimulationRunContent() {
   const runNominal = useServiceRoutingStore((state) => state.runNominal);
   const injectFaults = useServiceRoutingStore((state) => state.injectFaults);
   const analyzeFaultImpact = useServiceRoutingStore((state) => state.analyzeFaultImpact);
+  const executeHealing = useServiceRoutingStore((state) => state.executeHealing);
+  const recalculateHealedRoutes = useServiceRoutingStore((state) => state.recalculateHealedRoutes);
+  const runAfterHealing = useServiceRoutingStore((state) => state.runAfterHealing);
+  const verifyIndicators = useServiceRoutingStore((state) => state.verifyIndicators);
   const addFault = useServiceRoutingStore((state) => state.addFault);
   const updateFault = useServiceRoutingStore((state) => state.updateFault);
   const duplicateFault = useServiceRoutingStore((state) => state.duplicateFault);
@@ -114,12 +138,24 @@ function SimulationRunContent() {
   const faultCatalog = useMemo(() => faultCatalogMap(catalogs?.fault_modes), [catalogs]);
   const selectedService = services.find((service) => service.id === selectedServiceId) ?? services[0] ?? null;
   const selectedFault = faults.find((fault) => fault.id === selectedFaultId) ?? faults[0] ?? null;
-  const selectedRoute = selectedService ? (selectedStage === "before_healing" ? faultedRoutes[selectedService.id] : nominalRoutes[selectedService.id]) : undefined;
+  const selectedRoute = selectedService
+    ? selectedStage === "before_healing"
+      ? faultedRoutes[selectedService.id]
+      : selectedStage === "healing_actions"
+        ? postActionRoutes[selectedService.id]
+        : selectedStage === "after_healing" || selectedStage === "three_stage_comparison" || selectedStage === "indicators"
+          ? healedRoutes[selectedService.id]
+          : nominalRoutes[selectedService.id]
+    : undefined;
   const scenarioDuration = Number(scenario?.scenario.duration_s ?? 120);
 
   const canRunNominal = Boolean(sessionId) && routeStatus === CALCULATED && nominalStatus !== RUNNING;
   const canInjectFaults = nominalStatus === COMPLETED && faultInjectionStatus !== INJECTING;
   const canAnalyzeFaults = faultInjectionStatus === INJECTED && faultImpactStatus !== ANALYZING;
+  const canExecuteHealing = faultImpactStatus === COMPLETED && healingExecutionStatus !== "执行中";
+  const canRecalculateRoutes = healingExecutionStatus === "已执行" && healedRouteStatus !== CALCULATING;
+  const canRunAfterHealing = healedRouteStatus === CALCULATED && afterHealingStatus !== RUNNING;
+  const canVerifyIndicators = afterHealingStatus === COMPLETED && indicatorVerificationStatus !== "验证中";
 
   const runStep = (runner: () => Promise<void>) => {
     void runner().catch((reason) => message.error(reason instanceof Error ? reason.message : "操作失败"));
@@ -162,11 +198,27 @@ function SimulationRunContent() {
           <Button type="primary" ghost disabled={!canAnalyzeFaults} loading={faultImpactStatus === ANALYZING} onClick={() => runStep(analyzeFaultImpact)}>
             ⑤ 分析故障影响
           </Button>
+          <Button type="primary" ghost disabled={!canExecuteHealing} loading={!canExecuteHealing && faultImpactStatus === COMPLETED} onClick={() => runStep(executeHealing)}>
+            ⑥ 执行自愈
+          </Button>
+          <Button type="primary" ghost disabled={!canRecalculateRoutes} loading={healedRouteStatus === CALCULATING} onClick={() => runStep(recalculateHealedRoutes)}>
+            ⑦ 重新计算路径
+          </Button>
+          <Button type="primary" ghost disabled={!canRunAfterHealing} loading={afterHealingStatus === RUNNING} onClick={() => runStep(runAfterHealing)}>
+            ⑧ 运行自愈后状态
+          </Button>
+          <Button type="primary" ghost disabled={!canVerifyIndicators} loading={!canVerifyIndicators && afterHealingStatus === COMPLETED} onClick={() => runStep(verifyIndicators)}>
+            ⑨ 验证技术指标
+          </Button>
           <Tag color={statusColor(backendTopologyStatus)}>拓扑：{backendTopologyStatus}</Tag>
           <Tag color={statusColor(routeStatus)}>路径：{routeStatus}</Tag>
           <Tag color={statusColor(nominalStatus)}>正常：{nominalStatus}</Tag>
           <Tag color={statusColor(faultInjectionStatus)}>故障注入：{faultInjectionStatus}</Tag>
           <Tag color={statusColor(faultImpactStatus)}>影响分析：{faultImpactStatus}</Tag>
+          <Tag color={statusColor(healingExecutionStatus)}>自愈执行：{healingExecutionStatus}</Tag>
+          <Tag color={statusColor(healedRouteStatus)}>恢复路径：{healedRouteStatus}</Tag>
+          <Tag color={statusColor(afterHealingStatus)}>自愈后：{afterHealingStatus}</Tag>
+          <Tag color={statusColor(indicatorVerificationStatus)}>指标验证：{indicatorVerificationStatus}</Tag>
           {sessionId ? <Tag>Session {sessionId.slice(0, 8)}</Tag> : null}
           {error ? <Tag color="error">{error}</Tag> : null}
         </Space>
@@ -243,7 +295,50 @@ function SimulationRunContent() {
               )
           },
           {
-            key: "comparison",
+            key: "healing_actions",
+            label: "自愈动作",
+            children:
+              healingExecutionStatus === "已执行" ? (
+                <HealingActionsResults
+                  services={services}
+                  nodes={nodes}
+                  links={links}
+                  actions={nonRoutingHealingActions}
+                  topology={postActionTopology}
+                  routes={postActionRoutes}
+                  pendingRouteRecalculation={pendingRouteRecalculation}
+                  selectedService={selectedService}
+                  selectedRoute={selectedRoute}
+                  onSelectService={selectService}
+                />
+              ) : (
+                <ResultPlaceholder status={healingExecutionStatus} title="执行自愈" />
+              )
+          },
+          {
+            key: "after_healing",
+            label: "自愈后",
+            children:
+              healedRouteStatus === CALCULATED ? (
+                <AfterHealingResults
+                  services={services}
+                  nodes={nodes}
+                  links={links}
+                  topology={healedTopology}
+                  routes={healedRoutes}
+                  selectedService={selectedService}
+                  selectedRoute={selectedRoute}
+                  actions={allHealingActions}
+                  serviceResults={afterHealingServices}
+                  metrics={afterHealingMetrics}
+                  onSelectService={selectService}
+                />
+              ) : (
+                <ResultPlaceholder status={healedRouteStatus} title="重新计算路径" />
+              )
+          },
+          {
+            key: "three_stage_comparison",
             label: "正常—故障对比",
             children:
               faultImpactStatus === COMPLETED && faultImpact ? (
@@ -251,13 +346,25 @@ function SimulationRunContent() {
                   services={services}
                   nominalServices={nominalServices}
                   beforeHealingServices={beforeHealingServices}
+                  afterHealingServices={afterHealingServices}
                   beforeHealingMetrics={beforeHealingMetrics}
+                  afterHealingMetrics={afterHealingMetrics}
                   faultImpact={faultImpact}
                   onSelectNode={selectFaultImpactNode}
                   onSelectLink={selectFaultImpactLink}
                 />
               ) : (
                 <ResultPlaceholder status={faultImpactStatus} title="故障影响分析" />
+              )
+          },
+          {
+            key: "indicators",
+            label: "指标验证与报告",
+            children:
+              indicatorVerificationStatus === "已完成" && indicatorSummary ? (
+                <IndicatorResults sessionId={sessionId} indicators={indicatorChecks} summary={indicatorSummary} artifacts={artifacts} />
+              ) : (
+                <ResultPlaceholder status={indicatorVerificationStatus} title="指标验证与成果文件" />
               )
           }
         ]}
@@ -306,7 +413,7 @@ function FaultPlanPanel({
           className="full-width"
           value={value}
           options={catalogItems.map((item) => ({ value: item.id, label: item.display_name_zh ? `${item.display_name_zh} / ${item.id}` : item.id }))}
-          onChange={(type) => onUpdate(fault.id, { type, target: defaultTargetForScope(faultCatalog.get(type), nodes, links) })}
+          onChange={(type) => updateFaultType(fault, type, faultCatalog, nodes, links, onUpdate)}
         />
       )
     },
@@ -351,7 +458,7 @@ function FaultPlanPanel({
         </Button>
       }
     >
-      <FaultTimeline faults={faults} duration={scenarioDuration} faultCatalog={faultCatalog} selectedFaultId={selectedFault?.id ?? null} onSelectFault={onSelectFault} />
+      <FaultTimeline faults={faults} duration={scenarioDuration} nodes={nodes} links={links} faultCatalog={faultCatalog} selectedFaultId={selectedFault?.id ?? null} onSelectFault={onSelectFault} />
       <Table
         size="small"
         rowKey="id"
@@ -374,12 +481,16 @@ function FaultPlanPanel({
 function FaultTimeline({
   faults,
   duration,
+  nodes,
+  links,
   faultCatalog,
   selectedFaultId,
   onSelectFault
 }: {
   faults: FaultPayload[];
   duration: number;
+  nodes: NodePayload[];
+  links: LinkPayload[];
   faultCatalog: Map<string, CatalogItemResponse>;
   selectedFaultId: string | null;
   onSelectFault: (faultId: string) => void;
@@ -396,23 +507,38 @@ function FaultTimeline({
         const left = duration > 0 ? Math.max(0, Math.min(100, (fault.start_s / duration) * 100)) : 0;
         const width = duration > 0 ? Math.max(2, Math.min(100 - left, (fault.duration_s / duration) * 100)) : 2;
         const catalog = faultCatalog.get(fault.type);
+        const tooltip = (
+          <Space direction="vertical" size={2}>
+            <Text strong>{catalog?.display_name_zh ?? fault.type}</Text>
+            <Text>ID：{fault.id}</Text>
+            <Text>类型：{fault.type}</Text>
+            <Text>目标：{formatTargetDisplay(fault.target, nodes, links)}</Text>
+            <Text>开始：{fault.start_s} s</Text>
+            <Text>持续：{fault.duration_s} s</Text>
+            <Text>结束：{fault.start_s + fault.duration_s} s</Text>
+            <Text>严重程度：{fault.severity}</Text>
+            <Text>状态：{fault.enabled === false ? "已停用" : "已启用"}</Text>
+            <Text>实现：{catalog?.implementation_status === "registered_only" ? "仅登记" : "已实现"}</Text>
+          </Space>
+        );
         return (
           <div className="fault-timeline-row" key={fault.id}>
             <span className="fault-timeline-label">{fault.id}</span>
             <div className="fault-timeline-track">
-              <div
-                role="button"
-                tabIndex={0}
-                className={`fault-timeline-block ${fault.enabled === false ? "disabled" : ""} ${fault.id === selectedFaultId ? "selected" : ""}`}
-                style={{ left: `${left}%`, width: `${width}%` }}
-                title={`${catalog?.display_name_zh ?? fault.type} / ${fault.target} / ${fault.start_s}s + ${fault.duration_s}s`}
-                onClick={() => onSelectFault(fault.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") onSelectFault(fault.id);
-                }}
-              >
-                {catalog?.display_name_zh ?? fault.type}
-              </div>
+              <Tooltip title={tooltip} trigger={["hover", "focus"]}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className={`fault-timeline-block ${fault.enabled === false ? "disabled" : ""} ${fault.id === selectedFaultId ? "selected" : ""}`}
+                  style={{ left: `${left}%`, width: `${width}%` }}
+                  onClick={() => onSelectFault(fault.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") onSelectFault(fault.id);
+                  }}
+                >
+                  {catalog?.display_name_zh ?? fault.type}
+                </div>
+              </Tooltip>
             </div>
           </div>
         );
@@ -446,7 +572,14 @@ function FaultPropertyPanel({
       <Descriptions size="small" column={2} bordered>
         <Descriptions.Item label="ID">{fault.id}</Descriptions.Item>
         <Descriptions.Item label="启用"><Switch size="small" checked={fault.enabled !== false} onChange={(checked) => onToggle(fault.id, checked)} /></Descriptions.Item>
-        <Descriptions.Item label="类型">{fault.type}</Descriptions.Item>
+        <Descriptions.Item label="类型">
+          <Select
+            className="full-width fault-property-type-select"
+            value={fault.type}
+            options={Array.from(faultCatalog.values()).map((item) => ({ value: item.id, label: item.display_name_zh ? `${item.display_name_zh} / ${item.id}` : item.id }))}
+            onChange={(type) => updateFaultType(fault, type, faultCatalog, nodes, links, onUpdate)}
+          />
+        </Descriptions.Item>
         <Descriptions.Item label="中文名称">{catalog?.display_name_zh ?? "-"}</Descriptions.Item>
         <Descriptions.Item label="目标">
           <Select className="full-width" value={fault.target} options={targetOptions(catalog, nodes, links, fault.target)} onChange={(target) => onUpdate(fault.id, { target })} />
@@ -572,11 +705,120 @@ function FaultResults({
   );
 }
 
+function HealingActionsResults({
+  services,
+  nodes,
+  links,
+  actions,
+  topology,
+  routes,
+  pendingRouteRecalculation,
+  selectedService,
+  selectedRoute,
+  onSelectService
+}: {
+  services: ServicePayload[];
+  nodes: NodePayload[];
+  links: LinkPayload[];
+  actions: HealingActionResponse[];
+  topology: GraphSnapshotResponse | null;
+  routes: Record<string, RouteSnapshotItemResponse>;
+  pendingRouteRecalculation: boolean | null;
+  selectedService: ServicePayload | null;
+  selectedRoute?: RouteSnapshotItemResponse;
+  onSelectService: (serviceId: string | null) => void;
+}) {
+  return (
+    <Space direction="vertical" className="full-width">
+      <Alert
+        type="warning"
+        showIcon
+        message="第 6 步只执行非路由自愈动作，不会提前重路由；当前业务路径仍为故障后继承路径。"
+        description={`pending_route_recalculation = ${String(pendingRouteRecalculation)}`}
+      />
+      <HealingActionTable actions={actions} />
+      {topology ? (
+        <Card size="small" title="策略执行后、重路由前拓扑">
+          <StageTopologyGraph snapshot={topology} projectNodes={nodes} projectLinks={links} selectedRoute={selectedRoute} stage="healing_executed" />
+        </Card>
+      ) : null}
+      <FaultedRoutesTable services={services} routes={routes} nodes={nodes} onSelectService={onSelectService} />
+      <RouteDetails selectedService={selectedService} route={selectedRoute} nodes={nodes} />
+    </Space>
+  );
+}
+
+function AfterHealingResults({
+  services,
+  nodes,
+  links,
+  topology,
+  routes,
+  selectedService,
+  selectedRoute,
+  actions,
+  serviceResults,
+  metrics,
+  onSelectService
+}: {
+  services: ServicePayload[];
+  nodes: NodePayload[];
+  links: LinkPayload[];
+  topology: GraphSnapshotResponse | null;
+  routes: Record<string, RouteSnapshotItemResponse>;
+  selectedService: ServicePayload | null;
+  selectedRoute?: RouteSnapshotItemResponse;
+  actions: HealingActionResponse[];
+  serviceResults: ServiceSimulationResultResponse[];
+  metrics: MetricRowResponse[];
+  onSelectService: (serviceId: string | null) => void;
+}) {
+  return (
+    <Space direction="vertical" className="full-width">
+      <Alert type="info" showIcon message="自愈成功不等于故障节点恢复正常；本场景通过备用中继和业务策略绕过故障节点。" />
+      <HealingActionTable actions={actions} />
+      {topology ? (
+        <Card size="small" title="自愈后拓扑">
+          <StageTopologyGraph snapshot={topology} projectNodes={nodes} projectLinks={links} selectedRoute={selectedRoute} stage="after_healing" />
+        </Card>
+      ) : null}
+      <FaultedRoutesTable services={services} routes={routes} nodes={nodes} onSelectService={onSelectService} />
+      <RouteDetails selectedService={selectedService} route={selectedRoute} nodes={nodes} />
+      <ServiceResultTable services={services} results={serviceResults} nodes={nodes} onSelectService={onSelectService} />
+      <MetricTable metrics={metrics} title="自愈后指标" />
+    </Space>
+  );
+}
+
+function HealingActionTable({ actions }: { actions: HealingActionResponse[] }) {
+  return (
+    <Card size="small" title="自愈动作记录">
+      <Table
+        size="small"
+        rowKey={(row) => `${row.time_s}:${row.strategy}:${row.target}`}
+        dataSource={actions}
+        pagination={false}
+        columns={[
+          { title: "时间 s", dataIndex: "time_s" },
+          { title: "策略 ID", dataIndex: "strategy" },
+          { title: "目标", dataIndex: "target" },
+          { title: "动作", dataIndex: "action" },
+          { title: "成功", render: (_, row) => <Tag color={row.success ? "success" : "error"}>{row.success ? "成功" : "失败"}</Tag> },
+          { title: "响应 ms", render: (_, row) => formatSimulationNumber(row.measured_response_ms) },
+          { title: "备注", dataIndex: "notes" }
+        ]}
+      />
+    </Card>
+  );
+}
+
 function ComparisonResults({
   services,
   nominalServices,
   beforeHealingServices,
+  afterHealingServices,
   beforeHealingMetrics,
+  afterHealingMetrics,
   faultImpact,
   onSelectNode,
   onSelectLink
@@ -584,14 +826,17 @@ function ComparisonResults({
   services: ServicePayload[];
   nominalServices: ServiceSimulationResultResponse[];
   beforeHealingServices: ServiceSimulationResultResponse[];
+  afterHealingServices: ServiceSimulationResultResponse[];
   beforeHealingMetrics: MetricRowResponse[];
+  afterHealingMetrics: MetricRowResponse[];
   faultImpact: FaultImpactSummaryResponse;
   onSelectNode: (nodeId: string) => void;
   onSelectLink: (linkId: string | null) => void;
 }) {
   const nominalById = new Map(nominalServices.map((item) => [item.service_id, item]));
   const beforeById = new Map(beforeHealingServices.map((item) => [item.service_id, item]));
-  const compareRows = services.map((service) => ({ service, nominal: nominalById.get(service.id), before: beforeById.get(service.id) }));
+  const afterById = new Map(afterHealingServices.map((item) => [item.service_id, item]));
+  const compareRows = services.map((service) => ({ service, nominal: nominalById.get(service.id), before: beforeById.get(service.id), after: afterById.get(service.id) }));
   return (
     <Space direction="vertical" className="full-width">
       <Card size="small" title="故障影响总览">
@@ -606,12 +851,13 @@ function ComparisonResults({
           <Tag>活动链路 {String(faultImpact.summary.active_edge_count ?? "-")}</Tag>
         </Space>
       </Card>
+      <ThreeStageServiceTable rows={compareRows} />
       <Table
         size="small"
         rowKey={(row) => row.service.id}
         dataSource={compareRows}
         pagination={false}
-        scroll={{ x: 1280 }}
+        scroll={{ x: 1900 }}
         columns={[
           { title: "业务", fixed: "left", render: (_, row) => row.service.name || row.service.id },
           { title: "吞吐 正常", render: (_, row) => metricValue(row.nominal?.throughput_mbps, " Mbps") },
@@ -620,9 +866,17 @@ function ComparisonResults({
           { title: "时延 正常", render: (_, row) => metricValue(row.nominal?.end_to_end_delay_ms, " ms") },
           { title: "时延 故障后", render: (_, row) => metricValue(row.before?.end_to_end_delay_ms, " ms") },
           { title: "时延 变化", render: (_, row) => formatDelta(row.nominal?.end_to_end_delay_ms, row.before?.end_to_end_delay_ms) },
+          { title: "丢包率 正常", render: (_, row) => formatSimulationNumber(row.nominal?.packet_loss_rate ?? null, 6) },
+          { title: "丢包率 故障后", render: (_, row) => formatSimulationNumber(row.before?.packet_loss_rate ?? null, 6) },
           { title: "丢包率 变化", render: (_, row) => formatDelta(row.nominal?.packet_loss_rate, row.before?.packet_loss_rate) },
+          { title: "可用率 正常", render: (_, row) => formatSimulationNumber(row.nominal?.availability ?? null, 6) },
+          { title: "可用率 故障后", render: (_, row) => formatSimulationNumber(row.before?.availability ?? null, 6) },
           { title: "可用率 变化", render: (_, row) => formatDelta(row.nominal?.availability, row.before?.availability) },
+          { title: "成功率 正常", render: (_, row) => formatSimulationNumber(row.nominal?.success_rate ?? null, 6) },
+          { title: "成功率 故障后", render: (_, row) => formatSimulationNumber(row.before?.success_rate ?? null, 6) },
           { title: "成功率 变化", render: (_, row) => formatDelta(row.nominal?.success_rate, row.before?.success_rate) },
+          { title: "中断时间 正常", render: (_, row) => metricValue(row.nominal?.interruption_s, " s") },
+          { title: "中断时间 故障后", render: (_, row) => metricValue(row.before?.interruption_s, " s") },
           { title: "中断时间 变化", render: (_, row) => formatDelta(row.nominal?.interruption_s, row.before?.interruption_s) },
           { title: "可达性变化", render: (_, row) => `${boolLabel(row.nominal?.reachable)} -> ${boolLabel(row.before?.reachable)}` },
           { title: "路径有效性变化", render: (_, row) => `${boolLabel(row.nominal?.route_valid)} -> ${boolLabel(row.before?.route_valid)}` }
@@ -630,7 +884,118 @@ function ComparisonResults({
       />
       <MetricDeltaTable deltas={faultImpact.metric_deltas} />
       <MetricTable metrics={beforeHealingMetrics} title="故障后指标" />
+      <MetricTable metrics={afterHealingMetrics} title="自愈后指标" />
       <PropagationPanel faultImpact={faultImpact} />
+    </Space>
+  );
+}
+
+function ThreeStageServiceTable({
+  rows
+}: {
+  rows: Array<{
+    service: ServicePayload;
+    nominal?: ServiceSimulationResultResponse;
+    before?: ServiceSimulationResultResponse;
+    after?: ServiceSimulationResultResponse;
+  }>;
+}) {
+  return (
+    <Card size="small" title="三阶段业务恢复摘要">
+      <Table
+        size="small"
+        rowKey={(row) => row.service.id}
+        dataSource={rows}
+        pagination={false}
+        scroll={{ x: 1500 }}
+        columns={[
+          { title: "业务", fixed: "left", render: (_, row) => row.service.name || row.service.id },
+          { title: "吞吐 正常/故障/自愈", render: (_, row) => `${metricValue(row.nominal?.throughput_mbps, " Mbps")} / ${metricValue(row.before?.throughput_mbps, " Mbps")} / ${metricValue(row.after?.throughput_mbps, " Mbps")}` },
+          { title: "时延 正常/故障/自愈", render: (_, row) => `${metricValue(row.nominal?.end_to_end_delay_ms, " ms")} / ${metricValue(row.before?.end_to_end_delay_ms, " ms")} / ${metricValue(row.after?.end_to_end_delay_ms, " ms")}` },
+          { title: "丢包 正常/故障/自愈", render: (_, row) => `${formatSimulationNumber(row.nominal?.packet_loss_rate ?? null, 6)} / ${formatSimulationNumber(row.before?.packet_loss_rate ?? null, 6)} / ${formatSimulationNumber(row.after?.packet_loss_rate ?? null, 6)}` },
+          { title: "成功率 正常/故障/自愈", render: (_, row) => `${formatSimulationNumber(row.nominal?.success_rate ?? null, 6)} / ${formatSimulationNumber(row.before?.success_rate ?? null, 6)} / ${formatSimulationNumber(row.after?.success_rate ?? null, 6)}` },
+          { title: "自愈改善", render: (_, row) => formatDelta(row.before?.throughput_mbps, row.after?.throughput_mbps) },
+          { title: "与正常差距", render: (_, row) => formatDelta(row.nominal?.throughput_mbps, row.after?.throughput_mbps) },
+          { title: "可达", render: (_, row) => `${boolLabel(row.nominal?.reachable)} / ${boolLabel(row.before?.reachable)} / ${boolLabel(row.after?.reachable)}` },
+          { title: "路径有效", render: (_, row) => `${boolLabel(row.nominal?.route_valid)} / ${boolLabel(row.before?.route_valid)} / ${boolLabel(row.after?.route_valid)}` },
+          { title: "降级", render: (_, row) => `${boolLabel(row.nominal?.degraded)} / ${boolLabel(row.before?.degraded)} / ${boolLabel(row.after?.degraded)}` }
+        ]}
+      />
+      <Typography.Paragraph type="secondary" className="snapshot-note">
+        界面汇总值，由后端业务结果和自愈动作记录统计得到；不覆盖后端指标结论。
+      </Typography.Paragraph>
+    </Card>
+  );
+}
+
+function IndicatorResults({
+  sessionId,
+  indicators,
+  summary,
+  artifacts
+}: {
+  sessionId: string | null;
+  indicators: IndicatorCheckResponse[];
+  summary: { applicableCount: number; passedCount: number; failedCount: number; notApplicableCount: number };
+  artifacts: ArtifactItemResponse[];
+}) {
+  const { message } = App.useApp();
+  const download = async (filename?: string) => {
+    if (!sessionId || !filename) return;
+    const blob = filename === "__bundle__" ? await downloadArtifactBundle(sessionId) : await downloadArtifact(sessionId, filename);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename === "__bundle__" ? "lunar_comm_results.zip" : filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    message.success("下载已开始");
+  };
+  return (
+    <Space direction="vertical" className="full-width">
+      <Card size="small" title="指标验证结论">
+        <Space wrap>
+          <Tag>适用 {summary.applicableCount}</Tag>
+          <Tag color="success">通过 {summary.passedCount}</Tag>
+          <Tag color={summary.failedCount ? "error" : "success"}>未通过 {summary.failedCount}</Tag>
+          <Tag>不适用 {summary.notApplicableCount}</Tag>
+          {summary.failedCount === 0 ? <Tag color="success">全部适用技术指标通过</Tag> : null}
+        </Space>
+      </Card>
+      <Table
+        size="small"
+        rowKey="id"
+        dataSource={indicators}
+        pagination={{ pageSize: 8 }}
+        columns={[
+          { title: "指标", dataIndex: "indicator" },
+          { title: "ID", dataIndex: "id" },
+          { title: "层级", dataIndex: "layer" },
+          { title: "metric", dataIndex: "metric" },
+          { title: "判定", render: (_, row) => `${formatSimulationNumber(row.actual)} ${row.operator} ${formatSimulationNumber(row.threshold)} ${row.unit}` },
+          { title: "适用", render: (_, row) => boolLabel(row.applicable) },
+          { title: "状态", render: (_, row) => <Tag color={row.status === "passed" ? "success" : row.status === "failed" ? "error" : "default"}>{indicatorStatusLabel(row.status)}</Tag> },
+          { title: "不适用原因", render: (_, row) => row.not_applicable_reason || "-" },
+          { title: "验证方法", dataIndex: "verification_method" }
+        ]}
+      />
+      <Card size="small" title="成果文件">
+        <Button onClick={() => void download("__bundle__")} disabled={!sessionId}>下载全部 ZIP</Button>
+        <Table
+          size="small"
+          rowKey="filename"
+          dataSource={artifacts}
+          pagination={{ pageSize: 8 }}
+          columns={[
+            { title: "文件名", dataIndex: "filename" },
+            { title: "类型", dataIndex: "file_type" },
+            { title: "存在", render: (_, row) => boolLabel(row.exists) },
+            { title: "大小", render: (_, row) => `${row.size_bytes} B` },
+            { title: "用途", render: (_, row) => row.purpose_zh ?? "-" },
+            { title: "下载", render: (_, row) => <Button size="small" disabled={!row.exists || !sessionId} onClick={() => void download(row.filename)}>下载</Button> }
+          ]}
+        />
+      </Card>
     </Space>
   );
 }
@@ -870,6 +1235,42 @@ function ObjectTags({ title, values, color, onClick }: { title: string; values: 
   );
 }
 
+function updateFaultType(
+  fault: FaultPayload,
+  type: string,
+  faultCatalog: Map<string, CatalogItemResponse>,
+  nodes: NodePayload[],
+  links: LinkPayload[],
+  onUpdate: (faultId: string, patch: Partial<FaultPayload>) => void
+): void {
+  const catalog = faultCatalog.get(type);
+  const target = targetIsValidForScope(fault.target, catalog, nodes, links)
+    ? fault.target
+    : defaultTargetForScope(catalog, nodes, links);
+  onUpdate(fault.id, { type, target });
+}
+
+function targetIsValidForScope(target: string, catalog: CatalogItemResponse | undefined, nodes: NodePayload[], links: LinkPayload[]): boolean {
+  const scope = catalog?.target_scope ?? "node_or_link";
+  if (scope === "global") return target === "global";
+  if (scope === "all_rf_links") return target === "all_rf_links";
+  const isNode = nodes.some((node) => node.id === target);
+  const isLink = links.some((link, index) => (link.id || linkKey(link, index)) === target);
+  if (scope === "node") return isNode;
+  if (scope === "link") return isLink;
+  return isNode || isLink;
+}
+
+function formatTargetDisplay(target: string, nodes: NodePayload[], links: LinkPayload[]): string {
+  const node = nodes.find((item) => item.id === target);
+  if (node) return formatNodeDisplay(target, nodes);
+  const link = links.find((item, index) => (item.id || linkKey(item, index)) === target);
+  if (link) return `${link.name || link.id || "链路"}（${link.source} -> ${link.target}）`;
+  if (target === "all_rf_links") return "全部射频链路（all_rf_links）";
+  if (target === "global") return "全局网络（global）";
+  return `${target}（历史或自定义目标）`;
+}
+
 function targetOptions(catalog: CatalogItemResponse | undefined, nodes: NodePayload[], links: LinkPayload[], currentTarget?: string): DefaultOptionType[] {
   const scope = catalog?.target_scope ?? "node_or_link";
   const nodeOptions = nodes.map((node) => ({ value: node.id, label: `${formatNodeDisplay(node.id, nodes)} / ${node.type}${node.active === false ? " / 停用" : ""}` }));
@@ -906,15 +1307,15 @@ function implementationTag(item: CatalogItemResponse | undefined) {
 }
 
 function statusColor(status: string): string {
-  if ([BUILT, CALCULATED, COMPLETED, INJECTED].includes(status)) return "success";
-  if ([BUILDING, CALCULATING, RUNNING, INJECTING, ANALYZING].includes(status)) return "processing";
+  if ([BUILT, CALCULATED, COMPLETED, INJECTED, "已执行", "已完成"].includes(status)) return "success";
+  if ([BUILDING, CALCULATING, RUNNING, INJECTING, ANALYZING, "执行中", "验证中"].includes(status)) return "processing";
   if (status === EXPIRED) return "warning";
   if (status === FAILED) return "error";
   return "default";
 }
 
 function isAnyBusy(...statuses: string[]): boolean {
-  return statuses.some((status) => [RUNNING, INJECTING, ANALYZING].includes(status));
+  return statuses.some((status) => [RUNNING, INJECTING, ANALYZING, "执行中", "验证中"].includes(status));
 }
 
 function formatNodeDisplay(nodeId: string, nodes: NodePayload[]): string {
@@ -952,6 +1353,12 @@ function metricValue(value: unknown, unit = ""): string {
 function boolLabel(value: boolean | undefined): string {
   if (value == null) return "未知";
   return value ? "是" : "否";
+}
+
+function indicatorStatusLabel(status: IndicatorCheckResponse["status"]): string {
+  if (status === "passed") return "通过";
+  if (status === "failed") return "未通过";
+  return "不适用";
 }
 
 function metricMeta(layer: string, metric: string): { group: string; label: string; unit: string } {

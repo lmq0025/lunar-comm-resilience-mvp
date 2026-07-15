@@ -1,6 +1,8 @@
-import { useMemo } from "react";
-import { Background, Controls, MiniMap, ReactFlow, ReactFlowProvider, type Edge, type Node } from "@xyflow/react";
+import { useEffect, useMemo, useRef } from "react";
+import { App } from "antd";
+import { Background, Controls, MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type Node } from "@xyflow/react";
 import type { GraphSnapshotResponse, LinkPayload, NodePayload, RouteSnapshotItemResponse } from "../../api/contracts";
+import { computeSelectionCenter, LINK_HIGH_AVAILABILITY_DISPLAY_THRESHOLD, stageLinkStrokeColor } from "./stageTopologyGraphModel";
 
 export interface StageTopologyGraphProps {
   snapshot: GraphSnapshotResponse;
@@ -9,7 +11,7 @@ export interface StageTopologyGraphProps {
   selectedRoute?: RouteSnapshotItemResponse;
   selectedNodeIds?: string[];
   selectedLinkIds?: string[];
-  stage: "nominal" | "before_healing";
+  stage: "nominal" | "before_healing" | "healing_executed" | "after_healing";
   onNodeClick?: (nodeId: string) => void;
   onLinkClick?: (linkId: string) => void;
 }
@@ -17,8 +19,6 @@ export interface StageTopologyGraphProps {
 interface SnapshotNode {
   id?: string;
   name?: string | null;
-  type?: string;
-  role?: string;
   active?: boolean;
   availability?: number;
   position_x?: number | null;
@@ -32,8 +32,11 @@ interface SnapshotLink {
   kind?: string;
   active?: boolean;
   availability?: number;
-  bandwidth_mbps?: number;
-  delay_ms?: number;
+}
+
+interface FlowGraph {
+  nodes: Node[];
+  edges: Edge[];
 }
 
 export function StageTopologyGraph(props: StageTopologyGraphProps) {
@@ -55,10 +58,25 @@ function StageTopologyGraphInner({
   onNodeClick,
   onLinkClick
 }: StageTopologyGraphProps) {
+  const { message } = App.useApp();
+  const { setCenter } = useReactFlow();
   const graph = useMemo(
     () => buildFlow(snapshot, projectNodes, projectLinks, selectedRoute, selectedNodeIds, selectedLinkIds),
     [projectLinks, projectNodes, selectedLinkIds, selectedNodeIds, selectedRoute, snapshot]
   );
+  const lastSelectionKey = useRef<string>("");
+  const selectionKey = selectedNodeIds[0] ? `node:${selectedNodeIds[0]}` : selectedLinkIds[0] ? `link:${selectedLinkIds[0]}` : "";
+
+  useEffect(() => {
+    if (!selectionKey || selectionKey === lastSelectionKey.current) return;
+    lastSelectionKey.current = selectionKey;
+    const center = computeSelectionCenter(graph.nodes, graph.edges, selectedNodeIds, selectedLinkIds);
+    if (!center) {
+      message.warning("对象不存在或无法定位");
+      return;
+    }
+    void setCenter(center.x, center.y, { zoom: 1.2, duration: 350 });
+  }, [graph.edges, graph.nodes, message, selectedLinkIds, selectedNodeIds, selectionKey, setCenter]);
 
   return (
     <div className="stage-topology-graph" data-testid={`stage-topology-${stage}`}>
@@ -79,14 +97,15 @@ function StageTopologyGraphInner({
         <MiniMap pannable zoomable />
       </ReactFlow>
       <div className="stage-topology-legend">
-        <span><i className="legend-dot normal" />正常节点</span>
-        <span><i className="legend-dot route" />选中路径</span>
-        {stage === "before_healing" ? (
-          <>
-            <span><i className="legend-dot failed" />失效节点/链路</span>
-            <span><i className="legend-dot degraded" />退化链路</span>
-          </>
-        ) : null}
+        <span><i className="legend-dot normal" />正常活动链路</span>
+        <span><i className="legend-dot degraded" />{stage === "nominal" ? "低于高可用显示阈值" : "故障后退化或低可用链路"}</span>
+        <span><i className="legend-dot route" />当前业务路径</span>
+        {stage !== "nominal" ? <span><i className="legend-dot failed" />失效节点/链路</span> : null}
+      </div>
+      <div className="stage-topology-note">
+        {stage === "after_healing"
+          ? "自愈成功不等于故障硬件恢复；红色节点/链路可保留，蓝色路径表示业务绕行恢复。"
+          : `橙色不代表链路失效。该链路仍可用并参与连通与路由计算，只是当前可用率低于显示阈值 ${LINK_HIGH_AVAILABILITY_DISPLAY_THRESHOLD}。`}
       </div>
     </div>
   );
@@ -99,7 +118,7 @@ function buildFlow(
   selectedRoute: RouteSnapshotItemResponse | undefined,
   selectedNodeIds: string[],
   selectedLinkIds: string[]
-): { nodes: Node[]; edges: Edge[] } {
+): FlowGraph {
   const projectNodeMap = new Map(projectNodes.map((node) => [node.id, node]));
   const routeNodeIds = new Set(selectedRoute?.path ?? []);
   const routeEdges = new Set(routeEdgeKeys(selectedRoute?.path ?? []));
@@ -108,20 +127,16 @@ function buildFlow(
   const snapshotNodes = (snapshot.nodes as SnapshotNode[]).filter((node) => node.id);
 
   const nodes = snapshotNodes.map((node, index) => {
-    const projectNode = projectNodeMap.get(String(node.id));
+    const id = String(node.id);
+    const projectNode = projectNodeMap.get(id);
     const active = node.active !== false && node.availability !== 0;
-    const inRoute = routeNodeIds.has(String(node.id));
-    const selected = selectedNodes.has(String(node.id));
+    const inRoute = routeNodeIds.has(id);
+    const selected = selectedNodes.has(id);
     return {
-      id: String(node.id),
+      id,
       position: fallbackPosition(projectNode, node, index, snapshotNodes.length),
-      data: { label: node.name ? `${node.name}\n${node.id}` : String(node.id) },
-      className: [
-        "stage-topology-node",
-        active ? "active" : "failed",
-        inRoute ? "route" : "",
-        selected ? "selected" : ""
-      ].filter(Boolean).join(" "),
+      data: { label: node.name ? `${node.name}\n${id}` : id },
+      className: ["stage-topology-node", active ? "active" : "failed", inRoute ? "route" : "", selected ? "selected" : ""].filter(Boolean).join(" "),
       style: {
         border: selected ? "3px solid #1677ff" : inRoute ? "2px solid #1677ff" : active ? "1px solid #7a8aa0" : "2px solid #cf1322",
         background: active ? (inRoute ? "#e6f4ff" : "#ffffff") : "#fff1f0",
@@ -140,18 +155,20 @@ function buildFlow(
   const edges = (snapshot.links as SnapshotLink[])
     .filter((link) => link.source && link.target)
     .map((link, index) => {
-      const linkId = String(link.id || projectLinkId(projectLinks, String(link.source), String(link.target), index));
+      const source = String(link.source);
+      const target = String(link.target);
+      const linkId = String(link.id || projectLinkId(projectLinks, source, target, index));
       const active = link.active !== false && link.availability !== 0;
-      const degraded = active && finite(link.availability) != null && Number(link.availability) < 0.999;
-      const inRoute = routeEdges.has(edgeKey(String(link.source), String(link.target)));
+      const lowAvailability = active && finite(link.availability) != null && Number(link.availability) < LINK_HIGH_AVAILABILITY_DISPLAY_THRESHOLD;
+      const inRoute = routeEdges.has(edgeKey(source, target));
       const selected = selectedLinks.has(linkId);
-      const color = !active ? "#cf1322" : degraded ? "#d46b08" : inRoute ? "#1677ff" : "#667085";
+      const color = stageLinkStrokeColor(active, inRoute, lowAvailability);
       return {
         id: linkId,
-        source: String(link.source),
-        target: String(link.target),
+        source,
+        target,
         label: link.kind ?? linkId,
-        data: { linkId },
+        data: { linkId, lowAvailability },
         animated: Boolean(inRoute && selectedRoute?.valid),
         style: {
           stroke: color,
@@ -160,13 +177,7 @@ function buildFlow(
           opacity: selectedRoute && !inRoute ? 0.45 : 1
         },
         labelStyle: { fontSize: 10, fill: color },
-        className: [
-          "stage-topology-link",
-          active ? "active" : "failed",
-          degraded ? "degraded" : "",
-          inRoute ? "route" : "",
-          selected ? "selected" : ""
-        ].filter(Boolean).join(" ")
+        className: ["stage-topology-link", active ? "active" : "failed", lowAvailability ? "degraded" : "", inRoute ? "route" : "", selected ? "selected" : ""].filter(Boolean).join(" ")
       } satisfies Edge;
     });
 

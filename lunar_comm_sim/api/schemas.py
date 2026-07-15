@@ -149,6 +149,10 @@ class CatalogItemResponse(BaseModel):
     display_name_zh: str | None = None
     description_zh: str | None = None
     target_scope: str | None = None
+    execution_step: int | None = None
+    strategy_category: str | None = None
+    target_summary_zh: str | None = None
+    preconditions_zh: str | None = None
     implementation_status: str | None = None
     implemented_effect: str | None = None
     name_zh: str | None = None
@@ -428,15 +432,110 @@ class AnalyzeFaultImpactStepResponse(BaseModel):
     step_result: AnalyzeFaultImpactStepResultResponse
 
 
+class HealingActionResponse(BaseModel):
+    time_s: float
+    strategy: str
+    target: str
+    action: str
+    success: bool
+    measured_response_ms: JsonSafeFloat
+    notes: str
+
+
+class ExecuteHealingStepResultResponse(BaseModel):
+    healing_actions: list[HealingActionResponse]
+    pending_route_recalculation: bool
+    routes: dict[str, RouteSnapshotItemResponse]
+    topology: GraphSnapshotResponse
+
+
+class ExecuteHealingStepResponse(BaseModel):
+    session_id: str
+    completed_step: str
+    current_step: str
+    completed_steps: list[str]
+    next_allowed_step: str | None
+    step_result: ExecuteHealingStepResultResponse
+
+
+class RecalculateRoutesStepResultResponse(BaseModel):
+    healing_actions: list[HealingActionResponse]
+    pending_route_recalculation: bool
+    routes: dict[str, RouteSnapshotItemResponse]
+    topology: GraphSnapshotResponse
+
+
+class RecalculateRoutesStepResponse(BaseModel):
+    session_id: str
+    completed_step: str
+    current_step: str
+    completed_steps: list[str]
+    next_allowed_step: str | None
+    step_result: RecalculateRoutesStepResultResponse
+
+
+class RunAfterHealingStepResultResponse(BaseModel):
+    services: list[ServiceSimulationResultResponse]
+    metrics: list[MetricRowResponse]
+    topology: GraphSnapshotResponse
+    healing_actions: list[HealingActionResponse]
+    routes: dict[str, RouteSnapshotItemResponse]
+
+
+class RunAfterHealingStepResponse(BaseModel):
+    session_id: str
+    completed_step: str
+    current_step: str
+    completed_steps: list[str]
+    next_allowed_step: str | None
+    step_result: RunAfterHealingStepResultResponse
+
+
+class IndicatorCheckResponse(BaseModel):
+    id: str
+    indicator: str
+    layer: str
+    metric: str
+    operator: Literal["<=", ">="]
+    threshold: float
+    actual: JsonSafeFloat
+    unit: str
+    applicable: bool
+    status: Literal["passed", "failed", "not_applicable"]
+    not_applicable_reason: str
+    passed: bool
+    verification_method: str
+
+
 class ArtifactItemResponse(BaseModel):
     filename: str
     relative_path: str
     exists: bool
     size_bytes: int
+    file_type: str | None = None
+    purpose_zh: str | None = None
 
 
 class ArtifactManifestResponse(BaseModel):
     artifacts: list[ArtifactItemResponse]
+
+
+class VerifyIndicatorsStepResultResponse(BaseModel):
+    indicators: list[IndicatorCheckResponse]
+    applicable_count: int
+    passed_count: int
+    failed_count: int
+    not_applicable_count: int
+    artifacts: list[ArtifactItemResponse]
+
+
+class VerifyIndicatorsStepResponse(BaseModel):
+    session_id: str
+    completed_step: str
+    current_step: str
+    completed_steps: list[str]
+    next_allowed_step: str | None
+    step_result: VerifyIndicatorsStepResultResponse
 
 
 class DeleteSessionResponse(BaseModel):

@@ -1,9 +1,12 @@
 import { create } from "zustand";
 import type {
+  ArtifactItemResponse,
   FaultImpactSummaryResponse,
   FaultPayload,
   FaultRecordResponse,
   GraphSnapshotResponse,
+  HealingActionResponse,
+  IndicatorCheckResponse,
   MetricRowResponse,
   PhysicalModelMetricsResponse,
   PhysicalModelValidationItemResponse,
@@ -20,8 +23,13 @@ import {
   calculateRoutesStep,
   createSession,
   deleteSession,
+  executeHealingStep,
+  getArtifactManifest,
   injectFaultsStep,
-  runNominalStep
+  recalculateRoutesStep,
+  runAfterHealingStep,
+  runNominalStep,
+  verifyIndicatorsStep
 } from "../api/routing";
 import { servicePresetById } from "../features/services/servicePresets";
 import { useProjectStore } from "./projectStore";
@@ -47,19 +55,31 @@ const INJECTED = "\u5df2\u6ce8\u5165";
 const NOT_ANALYZED = "\u672a\u5206\u6790";
 const ANALYZING = "\u5206\u6790\u4e2d";
 
+const NOT_EXECUTED = "未执行";
+const EXECUTING = "执行中";
+const EXECUTED = "已执行";
+const NOT_VERIFIED = "未验证";
+const VERIFYING = "验证中";
+const VERIFIED = "已完成";
+
 export type BackendTopologyStatus = typeof NOT_BUILT | typeof BUILDING | typeof BUILT | typeof EXPIRED | typeof FAILED;
 export type RouteStatus = typeof NOT_CALCULATED | typeof CALCULATING | typeof CALCULATED | typeof EXPIRED | typeof FAILED;
 export type NominalStatus = typeof NOT_RUN | typeof RUNNING | typeof COMPLETED | typeof EXPIRED | typeof FAILED;
 export type FaultInjectionStatus = typeof NOT_INJECTED | typeof INJECTING | typeof INJECTED | typeof EXPIRED | typeof FAILED;
 export type FaultImpactStatus = typeof NOT_ANALYZED | typeof ANALYZING | typeof COMPLETED | typeof EXPIRED | typeof FAILED;
-export type SelectedStage = "nominal" | "before_healing" | "comparison";
+export type HealingExecutionStatus = typeof NOT_EXECUTED | typeof EXECUTING | typeof EXECUTED | typeof EXPIRED | typeof FAILED;
+export type HealedRouteStatus = typeof NOT_CALCULATED | typeof CALCULATING | typeof CALCULATED | typeof EXPIRED | typeof FAILED;
+export type AfterHealingStatus = typeof NOT_RUN | typeof RUNNING | typeof COMPLETED | typeof EXPIRED | typeof FAILED;
+export type IndicatorVerificationStatus = typeof NOT_VERIFIED | typeof VERIFYING | typeof VERIFIED | typeof EXPIRED | typeof FAILED;
+export type SelectedStage = "nominal" | "before_healing" | "healing_actions" | "after_healing" | "three_stage_comparison" | "indicators";
 export type RuntimeInvalidationReason =
   | "topology_changed"
   | "service_changed"
   | "fault_changed"
   | "project_changed"
   | "scenario_imported"
-  | "environment_changed";
+  | "environment_changed"
+  | "healing_changed";
 
 interface ServiceRoutingState {
   runtimeProjectId: string | null;
@@ -69,6 +89,10 @@ interface ServiceRoutingState {
   nominalStatus: NominalStatus;
   faultInjectionStatus: FaultInjectionStatus;
   faultImpactStatus: FaultImpactStatus;
+  healingExecutionStatus: HealingExecutionStatus;
+  healedRouteStatus: HealedRouteStatus;
+  afterHealingStatus: AfterHealingStatus;
+  indicatorVerificationStatus: IndicatorVerificationStatus;
   topologySnapshot: GraphSnapshotResponse | null;
   routes: Record<string, RouteSnapshotItemResponse>;
   nominalTopology: GraphSnapshotResponse | null;
@@ -83,6 +107,23 @@ interface ServiceRoutingState {
   beforeHealingServices: ServiceSimulationResultResponse[];
   beforeHealingMetrics: MetricRowResponse[];
   faultImpact: FaultImpactSummaryResponse | null;
+  nonRoutingHealingActions: HealingActionResponse[];
+  allHealingActions: HealingActionResponse[];
+  postActionTopology: GraphSnapshotResponse | null;
+  postActionRoutes: Record<string, RouteSnapshotItemResponse>;
+  pendingRouteRecalculation: boolean | null;
+  healedTopology: GraphSnapshotResponse | null;
+  healedRoutes: Record<string, RouteSnapshotItemResponse>;
+  afterHealingServices: ServiceSimulationResultResponse[];
+  afterHealingMetrics: MetricRowResponse[];
+  indicatorChecks: IndicatorCheckResponse[];
+  indicatorSummary: {
+    applicableCount: number;
+    passedCount: number;
+    failedCount: number;
+    notApplicableCount: number;
+  } | null;
+  artifacts: ArtifactItemResponse[];
   selectedStage: SelectedStage;
   selectedServiceId: string | null;
   selectedFaultId: string | null;
@@ -117,6 +158,11 @@ interface ServiceRoutingState {
   runNominal: () => Promise<void>;
   injectFaults: () => Promise<void>;
   analyzeFaultImpact: () => Promise<void>;
+  executeHealing: () => Promise<void>;
+  recalculateHealedRoutes: () => Promise<void>;
+  runAfterHealing: () => Promise<void>;
+  verifyIndicators: () => Promise<void>;
+  refreshArtifacts: () => Promise<void>;
 }
 
 const INITIAL_RUNTIME = {
@@ -126,6 +172,10 @@ const INITIAL_RUNTIME = {
   nominalStatus: NOT_RUN as NominalStatus,
   faultInjectionStatus: NOT_INJECTED as FaultInjectionStatus,
   faultImpactStatus: NOT_ANALYZED as FaultImpactStatus,
+  healingExecutionStatus: NOT_EXECUTED as HealingExecutionStatus,
+  healedRouteStatus: NOT_CALCULATED as HealedRouteStatus,
+  afterHealingStatus: NOT_RUN as AfterHealingStatus,
+  indicatorVerificationStatus: NOT_VERIFIED as IndicatorVerificationStatus,
   topologySnapshot: null,
   routes: {},
   nominalTopology: null,
@@ -140,6 +190,18 @@ const INITIAL_RUNTIME = {
   beforeHealingServices: [],
   beforeHealingMetrics: [],
   faultImpact: null,
+  nonRoutingHealingActions: [],
+  allHealingActions: [],
+  postActionTopology: null,
+  postActionRoutes: {},
+  pendingRouteRecalculation: null,
+  healedTopology: null,
+  healedRoutes: {},
+  afterHealingServices: [],
+  afterHealingMetrics: [],
+  indicatorChecks: [],
+  indicatorSummary: null,
+  artifacts: [],
   selectedStage: "nominal" as SelectedStage,
   selectedFaultId: null,
   selectedNodeIds: [],
@@ -541,6 +603,153 @@ export const useServiceRoutingStore = create<ServiceRoutingState>((set, get) => 
       if (get().operationSeq !== operationSeq) return;
       set({ faultImpactStatus: FAILED, beforeHealingServices: [], beforeHealingMetrics: [], faultImpact: null, error: errorMessage(error) });
     }
+  },
+
+  executeHealing: async () => {
+    const state = get();
+    if (isBusy(state)) return;
+    if (state.healingExecutionStatus === EXECUTED) return;
+    const sessionId = state.sessionId;
+    if (!sessionId || state.faultImpactStatus !== COMPLETED) {
+      set({ healingExecutionStatus: FAILED, error: "请先完成步骤 5 分析故障影响" });
+      return;
+    }
+    const operationSeq = state.operationSeq + 1;
+    set({
+      ...clearAfterStep6Results(),
+      operationSeq,
+      healingExecutionStatus: EXECUTING,
+      nonRoutingHealingActions: [],
+      postActionTopology: null,
+      postActionRoutes: {},
+      pendingRouteRecalculation: null,
+      error: null
+    });
+    try {
+      const step = await executeHealingStep(sessionId);
+      if (get().operationSeq !== operationSeq) return;
+      set({
+        healingExecutionStatus: EXECUTED,
+        healedRouteStatus: NOT_CALCULATED,
+        nonRoutingHealingActions: step.step_result.healing_actions,
+        allHealingActions: step.step_result.healing_actions,
+        postActionTopology: step.step_result.topology,
+        postActionRoutes: step.step_result.routes,
+        pendingRouteRecalculation: step.step_result.pending_route_recalculation,
+        selectedStage: "healing_actions",
+        error: null
+      });
+    } catch (error) {
+      if (get().operationSeq !== operationSeq) return;
+      set({
+        ...clearAfterStep6Results(),
+        healingExecutionStatus: FAILED,
+        nonRoutingHealingActions: [],
+        postActionTopology: null,
+        postActionRoutes: {},
+        pendingRouteRecalculation: null,
+        error: errorMessage(error)
+      });
+    }
+  },
+
+  recalculateHealedRoutes: async () => {
+    const state = get();
+    if (isBusy(state)) return;
+    if (state.healedRouteStatus === CALCULATED) return;
+    const sessionId = state.sessionId;
+    if (!sessionId || state.healingExecutionStatus !== EXECUTED) {
+      set({ healedRouteStatus: FAILED, error: "请先完成步骤 6 执行自愈" });
+      return;
+    }
+    const operationSeq = state.operationSeq + 1;
+    set({ ...clearAfterStep7Results(), operationSeq, healedRouteStatus: CALCULATING, healedTopology: null, healedRoutes: {}, error: null });
+    try {
+      const step = await recalculateRoutesStep(sessionId);
+      if (get().operationSeq !== operationSeq) return;
+      set({
+        healedRouteStatus: CALCULATED,
+        allHealingActions: step.step_result.healing_actions,
+        pendingRouteRecalculation: step.step_result.pending_route_recalculation,
+        healedTopology: step.step_result.topology,
+        healedRoutes: step.step_result.routes,
+        selectedStage: "after_healing",
+        error: null
+      });
+    } catch (error) {
+      if (get().operationSeq !== operationSeq) return;
+      set({ ...clearAfterStep7Results(), healedRouteStatus: FAILED, healedTopology: null, healedRoutes: {}, error: errorMessage(error) });
+    }
+  },
+
+  runAfterHealing: async () => {
+    const state = get();
+    if (isBusy(state)) return;
+    if (state.afterHealingStatus === COMPLETED) return;
+    const sessionId = state.sessionId;
+    if (!sessionId || state.healedRouteStatus !== CALCULATED) {
+      set({ afterHealingStatus: FAILED, error: "请先完成步骤 7 重新计算路径" });
+      return;
+    }
+    const operationSeq = state.operationSeq + 1;
+    set({ ...clearAfterStep8Results(), operationSeq, afterHealingStatus: RUNNING, afterHealingServices: [], afterHealingMetrics: [], error: null });
+    try {
+      const step = await runAfterHealingStep(sessionId);
+      if (get().operationSeq !== operationSeq) return;
+      set({
+        afterHealingStatus: COMPLETED,
+        afterHealingServices: step.step_result.services,
+        afterHealingMetrics: step.step_result.metrics,
+        healedTopology: step.step_result.topology,
+        healedRoutes: step.step_result.routes,
+        allHealingActions: step.step_result.healing_actions,
+        selectedStage: "three_stage_comparison",
+        error: null
+      });
+    } catch (error) {
+      if (get().operationSeq !== operationSeq) return;
+      set({ ...clearAfterStep8Results(), afterHealingStatus: FAILED, afterHealingServices: [], afterHealingMetrics: [], error: errorMessage(error) });
+    }
+  },
+
+  verifyIndicators: async () => {
+    const state = get();
+    if (isBusy(state)) return;
+    if (state.indicatorVerificationStatus === VERIFIED) return;
+    const sessionId = state.sessionId;
+    if (!sessionId || state.afterHealingStatus !== COMPLETED) {
+      set({ indicatorVerificationStatus: FAILED, error: "请先完成步骤 8 运行自愈后状态" });
+      return;
+    }
+    const operationSeq = state.operationSeq + 1;
+    set({ operationSeq, indicatorVerificationStatus: VERIFYING, indicatorChecks: [], indicatorSummary: null, artifacts: [], error: null });
+    try {
+      const step = await verifyIndicatorsStep(sessionId);
+      if (get().operationSeq !== operationSeq) return;
+      set({
+        indicatorVerificationStatus: VERIFIED,
+        indicatorChecks: step.step_result.indicators,
+        indicatorSummary: {
+          applicableCount: step.step_result.applicable_count,
+          passedCount: step.step_result.passed_count,
+          failedCount: step.step_result.failed_count,
+          notApplicableCount: step.step_result.not_applicable_count
+        },
+        artifacts: step.step_result.artifacts,
+        selectedStage: "indicators",
+        error: null
+      });
+    } catch (error) {
+      if (get().operationSeq !== operationSeq) return;
+      set({ indicatorVerificationStatus: FAILED, indicatorChecks: [], indicatorSummary: null, artifacts: [], error: errorMessage(error) });
+    }
+  },
+
+  refreshArtifacts: async () => {
+    const sessionId = get().sessionId;
+    if (!sessionId) return;
+    const manifest = await getArtifactManifest(sessionId);
+    set({ artifacts: manifest.artifacts });
   }
 }));
 
@@ -549,7 +758,8 @@ function clearDownstreamResults(): Partial<ServiceRoutingState> {
     ...clearNominalAndFaultResults(),
     nominalStatus: NOT_RUN,
     faultInjectionStatus: NOT_INJECTED,
-    faultImpactStatus: NOT_ANALYZED
+    faultImpactStatus: NOT_ANALYZED,
+    ...clearHealingResults()
   };
 }
 
@@ -574,8 +784,67 @@ function clearFaultResults(): Partial<ServiceRoutingState> {
     beforeHealingMetrics: [],
     faultImpact: null,
     faultImpactStatus: NOT_ANALYZED,
+    ...clearHealingResults(),
     selectedNodeIds: [],
     selectedLinkIds: []
+  };
+}
+
+function clearHealingResults(): Partial<ServiceRoutingState> {
+  return {
+    healingExecutionStatus: NOT_EXECUTED,
+    healedRouteStatus: NOT_CALCULATED,
+    afterHealingStatus: NOT_RUN,
+    indicatorVerificationStatus: NOT_VERIFIED,
+    nonRoutingHealingActions: [],
+    allHealingActions: [],
+    postActionTopology: null,
+    postActionRoutes: {},
+    pendingRouteRecalculation: null,
+    healedTopology: null,
+    healedRoutes: {},
+    afterHealingServices: [],
+    afterHealingMetrics: [],
+    indicatorChecks: [],
+    indicatorSummary: null,
+    artifacts: []
+  };
+}
+
+function clearAfterStep6Results(): Partial<ServiceRoutingState> {
+  return {
+    healedRouteStatus: NOT_CALCULATED,
+    afterHealingStatus: NOT_RUN,
+    indicatorVerificationStatus: NOT_VERIFIED,
+    allHealingActions: [],
+    healedTopology: null,
+    healedRoutes: {},
+    afterHealingServices: [],
+    afterHealingMetrics: [],
+    indicatorChecks: [],
+    indicatorSummary: null,
+    artifacts: []
+  };
+}
+
+function clearAfterStep7Results(): Partial<ServiceRoutingState> {
+  return {
+    afterHealingStatus: NOT_RUN,
+    indicatorVerificationStatus: NOT_VERIFIED,
+    afterHealingServices: [],
+    afterHealingMetrics: [],
+    indicatorChecks: [],
+    indicatorSummary: null,
+    artifacts: []
+  };
+}
+
+function clearAfterStep8Results(): Partial<ServiceRoutingState> {
+  return {
+    indicatorVerificationStatus: NOT_VERIFIED,
+    indicatorChecks: [],
+    indicatorSummary: null,
+    artifacts: []
   };
 }
 
@@ -670,7 +939,11 @@ function isBusy(state: ServiceRoutingState): boolean {
     state.routeStatus === CALCULATING ||
     state.nominalStatus === RUNNING ||
     state.faultInjectionStatus === INJECTING ||
-    state.faultImpactStatus === ANALYZING
+    state.faultImpactStatus === ANALYZING ||
+    state.healingExecutionStatus === EXECUTING ||
+    state.healedRouteStatus === CALCULATING ||
+    state.afterHealingStatus === RUNNING ||
+    state.indicatorVerificationStatus === VERIFYING
   );
 }
 
@@ -685,10 +958,23 @@ function hasRuntimeData(state: ServiceRoutingState): boolean {
     Boolean(state.faultedTopology) ||
     state.beforeHealingServices.length > 0 ||
     Boolean(state.faultImpact) ||
+    state.nonRoutingHealingActions.length > 0 ||
+    Boolean(state.postActionTopology) ||
+    Object.keys(state.postActionRoutes).length > 0 ||
+    Boolean(state.healedTopology) ||
+    Object.keys(state.healedRoutes).length > 0 ||
+    state.afterHealingServices.length > 0 ||
+    state.afterHealingMetrics.length > 0 ||
+    state.indicatorChecks.length > 0 ||
+    state.artifacts.length > 0 ||
     state.backendTopologyStatus === BUILT ||
     state.routeStatus === CALCULATED ||
     state.nominalStatus === COMPLETED ||
     state.faultInjectionStatus === INJECTED ||
-    state.faultImpactStatus === COMPLETED
+    state.faultImpactStatus === COMPLETED ||
+    state.healingExecutionStatus === EXECUTED ||
+    state.healedRouteStatus === CALCULATED ||
+    state.afterHealingStatus === COMPLETED ||
+    state.indicatorVerificationStatus === VERIFIED
   );
 }

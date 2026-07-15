@@ -85,3 +85,16 @@ npm.cmd run build
 - `lunar_comm_active_project_v1`
 
 路径计算 session、拓扑 snapshot、路由结果、正常仿真结果、故障注入结果和故障影响结果只存在运行时内存，不写入项目 JSON 或导出 YAML。刷新页面后允许丢失。
+
+## Round 5 current scope
+
+The frontend now supports the full backend-driven nine-step workflow:
+
+- Healing strategy configuration for five implemented strategies.
+- Step 6 non-routing healing execution.
+- Step 7 after-healing route recalculation or inherited-route verification.
+- Step 8 after-healing service simulation.
+- Step 9 technical indicator verification.
+- Required artifact manifest, single-file download, and ZIP download.
+
+Batch experiment pages remain reserved.

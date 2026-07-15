@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { NodePalette } from "../src/features/topology/NodePalette";
 import { PropertyPanel } from "../src/features/topology/PropertyPanel";
 import { ValidationPanel } from "../src/features/topology/ValidationPanel";
+import { BACKEND_FAULT_IDS, OFFLINE_FAULT_CATALOG } from "../src/features/simulation/faultCatalog";
+import { LINK_HIGH_AVAILABILITY_DISPLAY_THRESHOLD } from "../src/features/simulation/stageTopologyGraphModel";
 import { ServiceRoutingPage } from "../src/pages/ServiceRoutingPage";
 import { SimulationRunPage } from "../src/pages/SimulationRunPage";
 import { useProjectStore } from "../src/stores/projectStore";
@@ -27,6 +29,11 @@ beforeEach(() => {
 });
 
 describe("component rendering", () => {
+  it("keeps the offline fault catalog aligned with the backend fault ids", () => {
+    expect(OFFLINE_FAULT_CATALOG.map((item) => item.id)).toEqual([...BACKEND_FAULT_IDS]);
+    expect(OFFLINE_FAULT_CATALOG).toHaveLength(10);
+  });
+
   it("renders the node palette", () => {
     renderWithProviders(<NodePalette />);
     expect(screen.getByText("节点组件库")).toBeInTheDocument();
@@ -156,15 +163,28 @@ describe("component rendering", () => {
     fireEvent.click(await screen.findByText("正常—故障对比"));
 
     expect(screen.getByText("故障影响总览")).toBeInTheDocument();
+    expect(screen.getAllByText("丢包率 正常").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("丢包率 故障后").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("丢包率 变化").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("可用率 正常").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("可用率 故障后").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("可用率 变化").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("成功率 正常").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("成功率 故障后").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("成功率 变化").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("中断时间 正常").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("中断时间 故障后").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("中断时间 变化").length).toBeGreaterThan(0);
     expect(screen.getByText("传播真阳性数 (propagation_true_positive_count)")).toBeInTheDocument();
     expect(screen.getAllByText("service_unreachable").length).toBeGreaterThan(0);
   });
 
-  it("shows topology, fault selection, and complete service result fields", async () => {
+  it("shows topology, fault selection, tooltip details, type editing, and complete service result fields", async () => {
     seedCompletedSimulationPage();
     renderWithProviders(<SimulationRunPage />);
 
     expect(await screen.findByText("正常拓扑快照")).toBeInTheDocument();
+    expect(screen.getByText(`橙色不代表链路失效。该链路仍可用并参与连通与路由计算，只是当前可用率低于显示阈值 ${LINK_HIGH_AVAILABILITY_DISPLAY_THRESHOLD}。`)).toBeInTheDocument();
     expect(screen.getAllByText("可用率").length).toBeGreaterThan(0);
     expect(screen.getAllByText("中断时间").length).toBeGreaterThan(0);
     expect(screen.getAllByText("路由来源").length).toBeGreaterThan(0);
@@ -174,10 +194,22 @@ describe("component rendering", () => {
     fireEvent.click(screen.getAllByText("F1")[0]);
     expect(screen.getByText("选中故障属性")).toBeInTheDocument();
     expect(screen.getByText("严重度表示故障强度，不是发生概率。")).toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getAllByText("月面主枢纽失效")[0]);
+    await waitFor(() => expect(screen.getByText("严重程度：0.8")).toBeInTheDocument());
+    expect(screen.getByText("ID：F1")).toBeInTheDocument();
+    expect(screen.getByText("状态：已启用")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("故障后、自愈前"));
     expect(screen.getByText("故障后、自愈前拓扑快照")).toBeInTheDocument();
     expect(screen.getByText("失效节点/链路")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("正常状态"));
+
+    const typeSelect = document.querySelector(".fault-property-type-select .ant-select-selector");
+    expect(typeSelect).toBeTruthy();
+    fireEvent.mouseDown(typeSelect as Element);
+    fireEvent.click(await screen.findByText(/route_oscillation/));
+    expect(useProjectStore.getState().draftProject?.scenario.faults.schedule[0]?.type).toBe("route_oscillation");
+    expect(useProjectStore.getState().draftProject?.scenario.faults.enabled).toEqual(["route_oscillation"]);
   });
 });
 
@@ -219,26 +251,7 @@ function stubCatalogFetch() {
         JSON.stringify({
           node_types: [],
           link_types: [],
-          fault_modes: [
-            {
-              id: "main_hub_failure",
-              code: "main_hub_failure",
-              display_name_zh: "主枢纽失效",
-              description_zh: "关闭目标节点",
-              target_scope: "node",
-              implementation_status: "implemented",
-              implemented_effect: "target node disabled"
-            },
-            {
-              id: "link_outage",
-              code: "link_outage",
-              display_name_zh: "链路中断",
-              description_zh: "关闭目标链路",
-              target_scope: "link",
-              implementation_status: "implemented",
-              implemented_effect: "target link disabled"
-            }
-          ],
+          fault_modes: OFFLINE_FAULT_CATALOG,
           healing_strategies: [],
           routing_strategies: [],
           simulation_steps: []
@@ -252,7 +265,23 @@ function stubCatalogFetch() {
 function seedCompletedSimulationPage() {
   stubCatalogFetch();
   const project = useProjectStore.getState().createProject("simulation completed", "");
-  const scenario = defaultLikeScenario();
+  const scenario = {
+    ...defaultLikeScenario(),
+    faults: {
+      enabled: ["main_hub_failure"],
+      schedule: [
+        {
+          id: "F1",
+          type: "main_hub_failure",
+          start_s: 10,
+          duration_s: 20,
+          target: "node_1",
+          severity: 0.8,
+          enabled: true
+        }
+      ]
+    }
+  };
   useProjectStore.setState({
     draftProject: { ...project, scenario },
     activeProjectId: project.projectId,

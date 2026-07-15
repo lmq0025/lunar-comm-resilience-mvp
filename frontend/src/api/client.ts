@@ -55,6 +55,38 @@ export async function requestJson<TResponse>(
   }
 }
 
+export async function requestBlob(
+  path: string,
+  options: RequestInit & { timeoutMs?: number } = {}
+): Promise<Blob> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${apiBaseUrl()}${path}`, {
+      ...options,
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new ApiClientError(normalizeError(response.status, text ? parseJson(text) : null));
+    }
+    return await response.blob();
+  } catch (error) {
+    if (error instanceof ApiClientError) throw error;
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiClientError({ status: 0, code: "TIMEOUT", message: "后端请求超时" });
+    }
+    throw new ApiClientError({
+      status: 0,
+      code: "NETWORK_ERROR",
+      message: "后端未连接，无法下载成果文件",
+      details: error
+    });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 function parseJson(text: string): unknown {
   try {
     return JSON.parse(text);

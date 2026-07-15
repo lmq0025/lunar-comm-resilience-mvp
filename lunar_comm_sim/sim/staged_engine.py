@@ -54,6 +54,25 @@ REQUIRED_OUTPUTS = [
     "report.md",
 ]
 
+ARTIFACT_DESCRIPTIONS = {
+    "metrics_summary.csv": ("csv", "三阶段指标汇总"),
+    "indicator_check.csv": ("csv", "技术指标验证结果"),
+    "fault_events.csv": ("csv", "故障事件记录"),
+    "healing_actions.csv": ("csv", "自愈动作记录"),
+    "service_results.csv": ("csv", "三阶段业务结果"),
+    "service_routes.csv": ("csv", "三阶段业务路径"),
+    "fault_propagation_predictions.csv": ("csv", "故障传播预测"),
+    "observed_impacts.csv": ("csv", "故障实际影响"),
+    "fault_propagation_comparison.csv": ("csv", "预测与观测对比"),
+    "fault_propagation_metrics.csv": ("csv", "传播模型指标"),
+    "physical_model_validation.csv": ("csv", "物理模型验证明细"),
+    "physical_model_metrics.csv": ("csv", "物理模型指标"),
+    "topology_nominal.png": ("png", "正常拓扑图"),
+    "topology_before.png": ("png", "故障后拓扑图"),
+    "topology_after.png": ("png", "自愈后拓扑图"),
+    "report.md": ("markdown", "完整仿真报告"),
+}
+
 STEP_CREATED = "created"
 STEP_TOPOLOGY_BUILT = "topology_built"
 STEP_NOMINAL_ROUTES = "nominal_routes_calculated"
@@ -448,6 +467,8 @@ def artifact_manifest(state: StagedSimulationState) -> list[dict[str, Any]]:
                 "relative_path": path.as_posix(),
                 "exists": path.exists(),
                 "size_bytes": path.stat().st_size if path.exists() else 0,
+                "file_type": ARTIFACT_DESCRIPTIONS.get(name, ("file", ""))[0],
+                "purpose_zh": ARTIFACT_DESCRIPTIONS.get(name, ("file", ""))[1],
             }
         )
     return rows

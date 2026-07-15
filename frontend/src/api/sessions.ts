@@ -1,13 +1,18 @@
 import type {
   AnalyzeFaultImpactStepResponse,
+  ArtifactManifestResponse,
   BuildTopologyStepResponse,
   CalculateRoutesStepResponse,
+  ExecuteHealingStepResponse,
   InjectFaultsStepResponse,
+  RecalculateRoutesStepResponse,
+  RunAfterHealingStepResponse,
   RunNominalStepResponse,
   ScenarioPayload,
-  SessionSummaryResponse
+  SessionSummaryResponse,
+  VerifyIndicatorsStepResponse
 } from "./contracts";
-import { requestJson } from "./client";
+import { requestBlob, requestJson } from "./client";
 
 export function createSession(scenario: ScenarioPayload): Promise<SessionSummaryResponse> {
   return requestJson<SessionSummaryResponse>("/sessions", {
@@ -50,4 +55,40 @@ export function analyzeFaultImpactStep(sessionId: string): Promise<AnalyzeFaultI
   return requestJson<AnalyzeFaultImpactStepResponse>(`/sessions/${encodeURIComponent(sessionId)}/steps/analyze-fault-impact`, {
     method: "POST"
   });
+}
+
+export function executeHealingStep(sessionId: string): Promise<ExecuteHealingStepResponse> {
+  return requestJson<ExecuteHealingStepResponse>(`/sessions/${encodeURIComponent(sessionId)}/steps/execute-healing`, {
+    method: "POST"
+  });
+}
+
+export function recalculateRoutesStep(sessionId: string): Promise<RecalculateRoutesStepResponse> {
+  return requestJson<RecalculateRoutesStepResponse>(`/sessions/${encodeURIComponent(sessionId)}/steps/recalculate-routes`, {
+    method: "POST"
+  });
+}
+
+export function runAfterHealingStep(sessionId: string): Promise<RunAfterHealingStepResponse> {
+  return requestJson<RunAfterHealingStepResponse>(`/sessions/${encodeURIComponent(sessionId)}/steps/run-after-healing`, {
+    method: "POST"
+  });
+}
+
+export function verifyIndicatorsStep(sessionId: string): Promise<VerifyIndicatorsStepResponse> {
+  return requestJson<VerifyIndicatorsStepResponse>(`/sessions/${encodeURIComponent(sessionId)}/steps/verify-indicators`, {
+    method: "POST"
+  });
+}
+
+export function getArtifactManifest(sessionId: string): Promise<ArtifactManifestResponse> {
+  return requestJson<ArtifactManifestResponse>(`/sessions/${encodeURIComponent(sessionId)}/artifacts`);
+}
+
+export function downloadArtifact(sessionId: string, filename: string): Promise<Blob> {
+  return requestBlob(`/sessions/${encodeURIComponent(sessionId)}/artifacts/files/${encodeURIComponent(filename)}`);
+}
+
+export function downloadArtifactBundle(sessionId: string): Promise<Blob> {
+  return requestBlob(`/sessions/${encodeURIComponent(sessionId)}/artifacts/bundle`);
 }
