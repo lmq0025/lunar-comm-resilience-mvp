@@ -193,3 +193,27 @@ The review archive must include:
 - `project_tree.txt`
 
 Important: `data/baselines/rf_lifetime_reference.csv` and `data/baselines/dust_gain_reference.csv` must be delivered with the package.
+
+## Round 6 Local App
+
+Round 6 adds local SQLite persistence, project versions, run history, replay-based recovery, background step jobs, request IDs, client error reporting, and production FastAPI serving of `frontend/dist`.
+
+Useful commands:
+
+```bat
+scripts\build_local_app.bat
+scripts\run_local_app.bat
+scripts\backup_local_data.bat
+scripts\restore_local_data.bat C:\path\to\backup
+scripts\reset_local_data.bat
+```
+
+See:
+
+- `docs/full_software_round6_persistence_and_e2e.md`
+- `docs/database_schema.md`
+- `docs/local_deployment.md`
+- `docs/local_configuration.md`
+- `docs/data_backup_restore.md`
+- `docs/auth_and_permissions.md`
+- `docs/run_recovery.md`

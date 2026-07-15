@@ -1,6 +1,15 @@
 import { create } from "zustand";
 
-export type MainMenuKey = "projects" | "topology" | "services" | "faults" | "healing" | "simulation" | "results" | "experiments";
+export type MainMenuKey =
+  | "projects"
+  | "topology"
+  | "services"
+  | "faults"
+  | "healing"
+  | "simulation"
+  | "results"
+  | "runHistory"
+  | "experiments";
 
 interface UiStoreState {
   collapsed: boolean;

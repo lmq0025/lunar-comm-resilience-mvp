@@ -14,10 +14,17 @@ import type {
 } from "./contracts";
 import { requestBlob, requestJson } from "./client";
 
-export function createSession(scenario: ScenarioPayload): Promise<SessionSummaryResponse> {
+export function createSession(
+  scenario: ScenarioPayload,
+  project?: { projectId?: string | null; projectRevision?: number | null }
+): Promise<SessionSummaryResponse> {
   return requestJson<SessionSummaryResponse>("/sessions", {
     method: "POST",
-    body: JSON.stringify({ scenario })
+    body: JSON.stringify({
+      scenario,
+      project_id: project?.projectId ?? null,
+      project_revision: project?.projectRevision ?? null
+    })
   });
 }
 

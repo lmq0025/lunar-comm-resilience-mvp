@@ -98,3 +98,18 @@ The frontend now supports the full backend-driven nine-step workflow:
 - Required artifact manifest, single-file download, and ZIP download.
 
 Batch experiment pages remain reserved.
+
+## Round 6
+
+The frontend includes run history, backend project/run persistence API clients, client error reporting, and Playwright Chromium E2E scripts.
+
+```bash
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+npm run e2e:install
+npm run e2e
+```
+
+`npm run e2e` starts the FastAPI backend and Vite frontend on test ports, then executes the default nine-step scenario through Chromium.

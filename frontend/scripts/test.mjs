@@ -11,7 +11,8 @@ const ctx = await startVitest(
     root: process.cwd(),
     globals: true,
     environment: "jsdom",
-    setupFiles: ["./tests/setup.ts"]
+    setupFiles: ["./tests/setup.ts"],
+    exclude: ["node_modules/**", "dist/**", "e2e/**", "playwright-report/**", "test-results/**"]
   },
   {
     cacheDir: ".vite-cache",

@@ -140,10 +140,15 @@ export interface HealthResponse {
 
 export interface SessionCreateRequest {
   scenario: ScenarioPayload;
+  project_id?: string | null;
+  project_revision?: number | null;
 }
 
 export interface SessionSummaryResponse {
   session_id: string;
+  run_id?: string | null;
+  project_id?: string | null;
+  project_revision?: number | null;
   scenario_name?: string | null;
   current_step: string;
   completed_steps: string[];
@@ -437,3 +442,118 @@ export interface VerifyIndicatorsStepResultResponse {
 }
 
 export type VerifyIndicatorsStepResponse = StepResponse<VerifyIndicatorsStepResultResponse>;
+
+export interface UserResponse {
+  user_id: string;
+  username: string;
+  role: string;
+  is_active: boolean;
+  auth_mode?: string | null;
+}
+
+export interface ProjectResponse {
+  project_id: string;
+  owner_user_id: string;
+  name: string;
+  description: string;
+  revision: number;
+  deleted: boolean;
+  created_at: string;
+  updated_at: string;
+  scenario?: ScenarioPayload | null;
+  editor?: Record<string, unknown> | null;
+}
+
+export interface ProjectListResponse {
+  projects: ProjectResponse[];
+}
+
+export interface ProjectCreateRequest {
+  name: string;
+  description: string;
+  scenario: ScenarioPayload;
+  editor?: Record<string, unknown>;
+}
+
+export interface ProjectUpdateRequest {
+  expected_revision?: number | null;
+  name?: string | null;
+  description?: string | null;
+  scenario?: ScenarioPayload | null;
+  editor?: Record<string, unknown> | null;
+}
+
+export interface ProjectVersionResponse {
+  version_id: string;
+  project_id: string;
+  revision: number;
+  name: string;
+  description: string;
+  scenario: ScenarioPayload;
+  editor: Record<string, unknown>;
+  created_at: string;
+  created_by_user_id: string;
+}
+
+export interface ProjectVersionListResponse {
+  versions: ProjectVersionResponse[];
+}
+
+export interface RunStepHistoryResponse {
+  step_name: string;
+  step_index: number;
+  response: StepResponse<Record<string, unknown>>;
+  created_at: string;
+}
+
+export interface SimulationRunResponse {
+  run_id: string;
+  session_id: string;
+  project_id?: string | null;
+  project_revision?: number | null;
+  owner_user_id: string;
+  scenario_name?: string | null;
+  status: string;
+  current_step: string;
+  completed_steps: string[];
+  output_dir?: string | null;
+  created_at: string;
+  updated_at: string;
+  steps: RunStepHistoryResponse[];
+  artifacts: ArtifactItemResponse[];
+}
+
+export interface SimulationRunListResponse {
+  runs: SimulationRunResponse[];
+}
+
+export interface RestoreRunSessionResponse {
+  session: SessionSummaryResponse;
+  run: SimulationRunResponse;
+}
+
+export interface JobResponse {
+  job_id: string;
+  run_id: string;
+  step_name: string;
+  status: string;
+  cancellation_requested: boolean;
+  result?: Record<string, unknown> | null;
+  error?: Record<string, unknown> | null;
+  created_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
+export interface ClientErrorRequest {
+  message: string;
+  stack?: string | null;
+  url?: string | null;
+  user_agent?: string | null;
+  context?: Record<string, unknown>;
+}
+
+export interface ClientErrorResponse {
+  recorded: boolean;
+  request_id?: string | null;
+}

@@ -455,7 +455,11 @@ export const useServiceRoutingStore = create<ServiceRoutingState>((set, get) => 
       if (oldSessionId) {
         await deleteSession(oldSessionId).catch(() => undefined);
       }
-      const session = await createSession(scenario);
+      const project = useProjectStore.getState().draftProject;
+      const session = await createSession(scenario, {
+        projectId: project?.projectId ?? null,
+        projectRevision: typeof project?.revision === "number" ? project.revision : null
+      });
       newlyCreatedSessionId = session.session_id;
       if (get().operationSeq !== operationSeq) {
         await deleteSession(newlyCreatedSessionId).catch(() => undefined);

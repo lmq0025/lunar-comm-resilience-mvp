@@ -118,6 +118,8 @@ class ScenarioPayload(BaseModel):
 
 class SessionCreateRequest(BaseModel):
     scenario: ScenarioPayload
+    project_id: str | None = None
+    project_revision: int | None = None
 
 
 class ValidationIssueResponse(BaseModel):
@@ -181,6 +183,9 @@ JsonSafeOptionalFloat: TypeAlias = float | NonFiniteValueResponse | None
 
 class SessionSummaryResponse(BaseModel):
     session_id: str
+    run_id: str | None = None
+    project_id: str | None = None
+    project_revision: int | None = None
     scenario_name: str | None = None
     current_step: str
     completed_steps: list[str]
@@ -554,3 +559,156 @@ class ErrorDetailResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: ErrorDetailResponse
+
+
+class UserResponse(BaseModel):
+    user_id: str
+    username: str
+    role: str
+    is_active: bool
+    auth_mode: str | None = None
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    user: UserResponse
+    token: str | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=8)
+
+
+class UserCreateRequest(BaseModel):
+    username: str
+    password: str = Field(min_length=8)
+    role: Literal["admin", "user"] = "user"
+
+
+class UserUpdateRequest(BaseModel):
+    is_active: bool | None = None
+    role: Literal["admin", "user"] | None = None
+
+
+class ProjectCreateRequest(BaseModel):
+    name: str = Field(min_length=1)
+    description: str = ""
+    scenario: ScenarioPayload
+    editor: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProjectUpdateRequest(BaseModel):
+    expected_revision: int | None = None
+    name: str | None = None
+    description: str | None = None
+    scenario: ScenarioPayload | None = None
+    editor: dict[str, Any] | None = None
+
+
+class ProjectCopyRequest(BaseModel):
+    name: str | None = None
+
+
+class ProjectResponse(BaseModel):
+    project_id: str
+    owner_user_id: str
+    name: str
+    description: str
+    revision: int
+    deleted: bool
+    created_at: str
+    updated_at: str
+    scenario: dict[str, Any] | None = None
+    editor: dict[str, Any] | None = None
+
+
+class ProjectListResponse(BaseModel):
+    projects: list[ProjectResponse]
+
+
+class ProjectVersionResponse(BaseModel):
+    version_id: str
+    project_id: str
+    revision: int
+    name: str
+    description: str
+    scenario: dict[str, Any]
+    editor: dict[str, Any]
+    created_at: str
+    created_by_user_id: str
+
+
+class ProjectVersionListResponse(BaseModel):
+    versions: list[ProjectVersionResponse]
+
+
+class ProjectRestoreRequest(BaseModel):
+    revision: int
+
+
+class RunStepHistoryResponse(BaseModel):
+    step_name: str
+    step_index: int
+    response: dict[str, Any]
+    created_at: str
+
+
+class SimulationRunResponse(BaseModel):
+    run_id: str
+    session_id: str
+    project_id: str | None = None
+    project_revision: int | None = None
+    owner_user_id: str
+    scenario_name: str | None = None
+    status: str
+    current_step: str
+    completed_steps: list[str]
+    output_dir: str | None = None
+    created_at: str
+    updated_at: str
+    steps: list[RunStepHistoryResponse] = Field(default_factory=list)
+    artifacts: list[ArtifactItemResponse] = Field(default_factory=list)
+
+
+class SimulationRunListResponse(BaseModel):
+    runs: list[SimulationRunResponse]
+
+
+class RestoreRunSessionResponse(BaseModel):
+    session: SessionSummaryResponse
+    run: SimulationRunResponse
+
+
+class JobCreateResponse(BaseModel):
+    job_id: str
+    run_id: str
+    step_name: str
+    status: str
+    cancellation_requested: bool
+    result: dict[str, Any] | None = None
+    error: dict[str, Any] | None = None
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+
+
+class JobResponse(JobCreateResponse):
+    pass
+
+
+class ClientErrorRequest(BaseModel):
+    message: str
+    stack: str | None = None
+    url: str | None = None
+    user_agent: str | None = None
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+class ClientErrorResponse(BaseModel):
+    recorded: bool
+    request_id: str | None = None

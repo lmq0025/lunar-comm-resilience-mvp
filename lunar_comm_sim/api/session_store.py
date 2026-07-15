@@ -23,6 +23,10 @@ class SimulationSessionStore:
 
     def create(self, scenario: dict) -> StagedSimulationState:
         state = create_staged_state(scenario)
+        self.register(state)
+        return state
+
+    def register(self, state: StagedSimulationState) -> StagedSimulationState:
         with self._lock:
             self._sessions[state.session_id] = state
             self._session_locks[state.session_id] = RLock()

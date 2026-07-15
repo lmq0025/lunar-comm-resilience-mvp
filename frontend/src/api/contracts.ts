@@ -1,6 +1,8 @@
 export type {
   CatalogResponse,
   CatalogItemResponse,
+  ClientErrorRequest,
+  ClientErrorResponse,
   FaultPayload,
   FaultRecordResponse,
   FaultImpactSummaryResponse,
@@ -27,6 +29,12 @@ export type {
   ObservedImpactResponse,
   PhysicalModelMetricsResponse,
   PhysicalModelValidationItemResponse,
+  ProjectCreateRequest,
+  ProjectListResponse,
+  ProjectResponse,
+  ProjectUpdateRequest,
+  ProjectVersionListResponse,
+  ProjectVersionResponse,
   PropagationComparisonResponse,
   PropagationMetricsResponse,
   PropagationPredictionResponse,
@@ -38,10 +46,15 @@ export type {
   ScenarioValidationResponse,
   SessionCreateRequest,
   SessionSummaryResponse,
+  SimulationRunListResponse,
+  SimulationRunResponse,
   ServiceSimulationResultResponse,
   ServicePayload,
   StepResponse,
   TechnicalIndicatorPayload,
+  UserResponse,
   ValidationIssueResponse,
-  VerifyIndicatorsStepResponse
+  VerifyIndicatorsStepResponse,
+  JobResponse,
+  RestoreRunSessionResponse
 } from "./generated/openapi";

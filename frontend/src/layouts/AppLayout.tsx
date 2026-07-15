@@ -5,6 +5,7 @@ import {
   CloudServerOutlined,
   ExperimentOutlined,
   FolderOpenOutlined,
+  HistoryOutlined,
   PlayCircleOutlined,
   ProjectOutlined,
   SafetyCertificateOutlined,
@@ -17,6 +18,7 @@ import { useHealthQuery } from "../api/health";
 import { SaveAsProjectModal } from "../components/SaveAsProjectModal";
 import { HealingStrategyPage } from "../pages/HealingStrategyPage";
 import { ProjectManagerPage } from "../pages/ProjectManagerPage";
+import { RunHistoryPage } from "../pages/RunHistoryPage";
 import { ServiceRoutingPage } from "../pages/ServiceRoutingPage";
 import { SimulationRunPage } from "../pages/SimulationRunPage";
 import { TopologyEditorPage } from "../pages/TopologyEditorPage";
@@ -25,7 +27,7 @@ import { type MainMenuKey, useUiStore } from "../stores/uiStore";
 import { downloadText, stringifyProjectJson, stringifyScenarioYaml } from "../utils/importExport";
 
 const { Header, Sider, Content, Footer } = Layout;
-const disabledMessage = "将在后续开发轮次开放";
+const disabledMessage = "Available in a later round";
 
 export function AppLayout() {
   const { message } = App.useApp();
@@ -45,18 +47,18 @@ export function AppLayout() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         saveCurrent();
-        message.success("项目已保存");
+        message.success("Project saved");
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [message, saveCurrent]);
 
-  const backendStatus = isLoading ? "检查中" : isError ? "未连接" : "已连接";
-  const backendColor = backendStatus === "已连接" ? "success" : backendStatus === "检查中" ? "processing" : "error";
+  const backendStatus = isLoading ? "Checking" : isError ? "Disconnected" : "Connected";
+  const backendColor = backendStatus === "Connected" ? "success" : backendStatus === "Checking" ? "processing" : "error";
   const saveAsInitial = useMemo(
     () => ({
-      name: `${draftProject?.name ?? "项目"} - 另存`,
+      name: `${draftProject?.name ?? "Project"} - Copy`,
       description: draftProject?.description ?? ""
     }),
     [draftProject]
@@ -64,7 +66,7 @@ export function AppLayout() {
 
   const exportYaml = () => {
     if (!draftProject) {
-      message.warning("没有可导出的项目");
+      message.warning("No project to export");
       return;
     }
     downloadText(`${draftProject.name}.yaml`, stringifyScenarioYaml(draftProject.scenario), "application/x-yaml");
@@ -72,7 +74,7 @@ export function AppLayout() {
 
   const exportProject = () => {
     if (!draftProject) {
-      message.warning("没有可导出的项目");
+      message.warning("No project to export");
       return;
     }
     downloadText(`${draftProject.name}.lunar-project.json`, stringifyProjectJson(draftProject), "application/json");
@@ -83,27 +85,27 @@ export function AppLayout() {
       <Header className="top-bar">
         <Space className="top-left" size={16}>
           <Typography.Title level={4} className="app-title">
-            月面通信网络韧性仿真平台
+            Lunar Communication Resilience Platform
           </Typography.Title>
-          <Tag color="blue">{draftProject?.name ?? "未打开项目"}</Tag>
-          <Tag color={dirty ? "warning" : "success"}>{dirty ? "未保存" : "已保存"}</Tag>
+          <Tag color="blue">{draftProject?.name ?? "No project opened"}</Tag>
+          <Tag color={dirty ? "warning" : "success"}>{dirty ? "Unsaved" : "Saved"}</Tag>
         </Space>
         <Space>
-          <Tooltip title="保存项目">
+          <Tooltip title="Save project">
             <Button
               icon={<SaveOutlined />}
               onClick={() => {
                 saveCurrent();
-                message.success("项目已保存");
+                message.success("Project saved");
               }}
             />
           </Tooltip>
-          <Button onClick={() => setSaveAsOpen(true)}>另存为</Button>
+          <Button onClick={() => setSaveAsOpen(true)}>Save as</Button>
           <Button icon={<UploadOutlined />} onClick={() => setActiveMenu("projects")}>
-            导入
+            Import
           </Button>
-          <Button onClick={exportYaml}>导出 YAML</Button>
-          <Button onClick={exportProject}>导出项目 JSON</Button>
+          <Button onClick={exportYaml}>Export YAML</Button>
+          <Button onClick={exportProject}>Export project JSON</Button>
           <Tag color={backendColor}>{backendStatus}</Tag>
           {health ? <Tag>{health.version}</Tag> : null}
         </Space>
@@ -115,14 +117,15 @@ export function AppLayout() {
             selectedKeys={[activeMenu]}
             onClick={({ key }) => setActiveMenu(key as MainMenuKey)}
             items={[
-              { key: "projects", icon: <FolderOpenOutlined />, label: "项目管理" },
-              { key: "topology", icon: <ShareAltOutlined />, label: "拓扑构建" },
-              { key: "services", icon: <ProjectOutlined />, label: "业务配置" },
-              { key: "faults", icon: <CloudServerOutlined />, label: "故障注入" },
-              { key: "healing", icon: <SafetyCertificateOutlined />, label: "自愈策略" },
-              { key: "simulation", icon: <PlayCircleOutlined />, label: "仿真运行" },
-              { key: "results", icon: <BarChartOutlined />, label: "结果分析" },
-              { key: "experiments", icon: <ExperimentOutlined />, label: "批量实验", disabled: true, title: disabledMessage }
+              { key: "projects", icon: <FolderOpenOutlined />, label: "Projects" },
+              { key: "topology", icon: <ShareAltOutlined />, label: "Topology" },
+              { key: "services", icon: <ProjectOutlined />, label: "Services" },
+              { key: "faults", icon: <CloudServerOutlined />, label: "Faults" },
+              { key: "healing", icon: <SafetyCertificateOutlined />, label: "Healing" },
+              { key: "simulation", icon: <PlayCircleOutlined />, label: "Simulation" },
+              { key: "results", icon: <BarChartOutlined />, label: "Results" },
+              { key: "runHistory", icon: <HistoryOutlined />, label: "Run history" },
+              { key: "experiments", icon: <ExperimentOutlined />, label: "Experiments", disabled: true, title: disabledMessage }
             ]}
           />
         </Sider>
@@ -133,6 +136,8 @@ export function AppLayout() {
             <ServiceRoutingPage />
           ) : activeMenu === "healing" ? (
             <HealingStrategyPage />
+          ) : activeMenu === "runHistory" ? (
+            <RunHistoryPage />
           ) : activeMenu === "faults" || activeMenu === "simulation" || activeMenu === "results" ? (
             <SimulationRunPage />
           ) : (
@@ -142,14 +147,14 @@ export function AppLayout() {
       </Layout>
       <Footer className="status-bar">
         <Space split={<span>/</span>}>
-          <span>节点 {draftProject?.scenario.nodes.length ?? 0}</span>
-          <span>链路 {draftProject?.scenario.links.length ?? 0}</span>
-          <span>业务 {draftProject?.scenario.services.length ?? 0}</span>
-          <span>故障 {draftProject?.scenario.faults.schedule.length ?? 0}</span>
-          <span>自愈 {draftProject?.scenario.healing.enabled.length ?? 0}</span>
-          <span>指标 {draftProject?.scenario.technical_indicators.length ?? 0}</span>
+          <span>Nodes {draftProject?.scenario.nodes.length ?? 0}</span>
+          <span>Links {draftProject?.scenario.links.length ?? 0}</span>
+          <span>Services {draftProject?.scenario.services.length ?? 0}</span>
+          <span>Faults {draftProject?.scenario.faults.schedule.length ?? 0}</span>
+          <span>Healing {draftProject?.scenario.healing.enabled.length ?? 0}</span>
+          <span>Indicators {draftProject?.scenario.technical_indicators.length ?? 0}</span>
           <span>
-            <ApiOutlined /> 后端 {backendStatus}
+            <ApiOutlined /> Backend {backendStatus}
           </span>
         </Space>
       </Footer>
@@ -160,7 +165,7 @@ export function AppLayout() {
         onSubmit={(values) => {
           const saved = saveAs(values.name, values.description);
           if (saved) {
-            message.success("已另存为新项目");
+            message.success("Project copied");
             setSaveAsOpen(false);
           }
         }}

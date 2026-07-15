@@ -9,6 +9,7 @@ export interface EditorViewport {
 export interface LunarProjectDocument {
   schemaVersion: "1.0";
   projectId: string;
+  revision?: number;
   name: string;
   description: string;
   createdAt: string;

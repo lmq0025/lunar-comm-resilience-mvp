@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0\.."
-python -c "import fastapi, uvicorn, httpx" >nul 2>nul
+python -c "import fastapi, uvicorn, httpx, sqlalchemy, alembic" >nul 2>nul
 if errorlevel 1 (
     echo FastAPI backend dependencies are missing.
     echo Run:

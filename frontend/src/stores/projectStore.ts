@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { ScenarioValidationResponse } from "../api/contracts";
+import type { ProjectResponse, ScenarioValidationResponse } from "../api/contracts";
+import { createProjectDocument, listProjects, updateProjectDocument } from "../api/projects";
 import type { EditorViewport, LunarProjectDocument, ValidationStatus } from "../types/project";
 import { cloneProject, listProjectItems, loadActiveProjectId, loadProjects, saveActiveProjectId, saveProjects } from "../utils/storage";
 import { createBlankScenario } from "../utils/scenarioTemplates";
@@ -48,6 +49,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       validationStatus: "未验证",
       validationResult: null
     });
+    void hydrateProjectsFromBackend();
   },
 
   createProject: (name, description) => {
@@ -98,6 +100,15 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       activeProjectId: saved.projectId,
       draftProject: cloneProject(saved),
       dirty: false
+    });
+    void persistProjectToBackend(saved).then((persisted) => {
+      if (!persisted) return;
+      const refreshed = { ...saved, revision: persisted.revision, projectId: persisted.project_id, updatedAt: persisted.updated_at };
+      const existing = useProjectStore.getState().projects.filter((project) => project.projectId !== saved.projectId);
+      const refreshedProjects = upsertProject(existing, refreshed);
+      saveProjects(refreshedProjects);
+      saveActiveProjectId(refreshed.projectId);
+      useProjectStore.setState({ projects: refreshedProjects, activeProjectId: refreshed.projectId, draftProject: cloneProject(refreshed) });
     });
   },
 
@@ -251,6 +262,63 @@ function normalizeEditor(project: LunarProjectDocument): LunarProjectDocument {
       nodeTypeCounters: project.editor.nodeTypeCounters ?? inferNodeTypeCounters(project)
     }
   };
+}
+
+async function hydrateProjectsFromBackend(): Promise<void> {
+  try {
+    const response = await listProjects();
+    if (!response.projects.length) return;
+    const backendProjects = response.projects.map(projectFromBackend);
+    const activeProjectId = loadActiveProjectId();
+    const activeProject =
+      backendProjects.find((project) => project.projectId === activeProjectId) ?? backendProjects[0] ?? null;
+    saveProjects(backendProjects);
+    saveActiveProjectId(activeProject?.projectId ?? null);
+    useProjectStore.setState({
+      projects: backendProjects,
+      activeProjectId: activeProject?.projectId ?? null,
+      draftProject: activeProject ? normalizeEditor(cloneProject(activeProject)) : null,
+      dirty: false
+    });
+  } catch {
+    // Backend persistence is best-effort for the draft UI; localStorage remains the offline cache.
+  }
+}
+
+async function persistProjectToBackend(project: LunarProjectDocument): Promise<ProjectResponse | null> {
+  try {
+    if (project.revision) {
+      return await updateProjectDocument(project.projectId, {
+        expected_revision: project.revision,
+        name: project.name,
+        description: project.description,
+        scenario: project.scenario,
+        editor: project.editor
+      });
+    }
+    return await createProjectDocument({
+      name: project.name,
+      description: project.description,
+      scenario: project.scenario,
+      editor: project.editor
+    });
+  } catch {
+    return null;
+  }
+}
+
+function projectFromBackend(project: ProjectResponse): LunarProjectDocument {
+  return normalizeEditor({
+    schemaVersion: "1.0",
+    projectId: project.project_id,
+    revision: project.revision,
+    name: project.name,
+    description: project.description,
+    createdAt: project.created_at,
+    updatedAt: project.updated_at,
+    scenario: project.scenario as LunarProjectDocument["scenario"],
+    editor: (project.editor ?? { nodeTypeCounters: {} }) as LunarProjectDocument["editor"]
+  });
 }
 
 function inferNodeTypeCounters(project: LunarProjectDocument): Record<string, number> {
