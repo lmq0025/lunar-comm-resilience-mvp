@@ -1,0 +1,22 @@
+以后直接执行：
+
+scripts\build_local_app.bat
+
+就不需要再手工设置 pytest 临时目录。
+
+构建成功后启动
+
+构建完成后执行：
+
+$env:LUNAR_APP_DATA_DIR = "E:\LunarCommMVP\local_app_data_round61_test"
+$env:LUNAR_AUTH_MODE = "disabled"
+$env:LUNAR_API_PORT = "8765"
+$env:LUNAR_OPEN_BROWSER = "1"
+
+scripts\run_local_app.bat
+
+然后观察页面右上角应显示：
+
+后端已连接
+
+再继续导入默认场景和进行九步手动测试。
