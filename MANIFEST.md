@@ -4,7 +4,7 @@
 - Project: Lunar Comm Resilience MVP
 - Version: MVP v1.0-final
 - Generated date: 2026-07-16
-- Python version: 3.13.5
+- Python version: 3.11.15
 - Main dependencies: numpy, pandas, networkx, simpy, pydantic, pyyaml, matplotlib, plotly, streamlit, typer, rich, pytest
 
 ## Core Directories
