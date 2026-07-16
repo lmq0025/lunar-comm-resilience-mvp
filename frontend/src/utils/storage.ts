@@ -2,6 +2,7 @@ import type { LunarProjectDocument, ProjectListItem } from "../types/project";
 
 export const PROJECTS_KEY = "lunar_comm_projects_v1";
 export const ACTIVE_PROJECT_KEY = "lunar_comm_active_project_v1";
+export const DRAFT_PROJECT_KEY = "lunar_comm_unsaved_draft_v1";
 
 export class StorageError extends Error {
   constructor(message: string) {
@@ -35,6 +36,21 @@ export function saveProjects(projects: LunarProjectDocument[]): void {
   } catch {
     throw new StorageError("写入本地项目失败");
   }
+}
+
+export function loadDraftProject(): LunarProjectDocument | null {
+  const raw = localStorage.getItem(DRAFT_PROJECT_KEY);
+  if (!raw) return null;
+  try {
+    return normalizeProject(JSON.parse(raw) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+export function saveDraftProject(project: LunarProjectDocument | null): void {
+  if (project) localStorage.setItem(DRAFT_PROJECT_KEY, JSON.stringify(project));
+  else localStorage.removeItem(DRAFT_PROJECT_KEY);
 }
 
 export function loadActiveProjectId(): string | null {

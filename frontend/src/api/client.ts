@@ -1,6 +1,6 @@
 import type { ApiErrorBody } from "../types/api";
 
-const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+const API_BASE_URL = "/api/v1";
 const DEFAULT_TIMEOUT_MS = 8000;
 
 export class ApiClientError extends Error {
@@ -13,9 +13,11 @@ export class ApiClientError extends Error {
   }
 }
 
-export function apiBaseUrl(): string {
-  return import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+export function getApiBaseUrl(): string {
+  return API_BASE_URL;
 }
+
+export const apiBaseUrl = getApiBaseUrl;
 
 export async function requestJson<TResponse>(
   path: string,
@@ -24,7 +26,7 @@ export async function requestJson<TResponse>(
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
-    const response = await fetch(`${apiBaseUrl()}${path}`, {
+    const response = await fetch(`${getApiBaseUrl()}${path}`, {
       ...options,
       signal: controller.signal,
       headers: {
@@ -36,7 +38,7 @@ export async function requestJson<TResponse>(
     const text = await response.text();
     const body = text ? parseJson(text) : null;
     if (!response.ok) {
-      throw new ApiClientError(normalizeError(response.status, body));
+      throw new ApiClientError(normalizeError(response.status, body, response.headers.get("X-Request-ID")));
     }
     return body as TResponse;
   } catch (error) {
@@ -62,13 +64,13 @@ export async function requestBlob(
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
-    const response = await fetch(`${apiBaseUrl()}${path}`, {
+    const response = await fetch(`${getApiBaseUrl()}${path}`, {
       ...options,
       signal: controller.signal
     });
     if (!response.ok) {
       const text = await response.text();
-      throw new ApiClientError(normalizeError(response.status, text ? parseJson(text) : null));
+      throw new ApiClientError(normalizeError(response.status, text ? parseJson(text) : null, response.headers.get("X-Request-ID")));
     }
     return await response.blob();
   } catch (error) {
@@ -95,13 +97,14 @@ function parseJson(text: string): unknown {
   }
 }
 
-function normalizeError(status: number, body: unknown): ApiErrorBody {
+function normalizeError(status: number, body: unknown, requestId: string | null): ApiErrorBody {
   if (isErrorEnvelope(body)) {
     return {
       status,
       code: String(body.error.code),
       message: String(body.error.message),
-      details: body.error
+      details: body.error,
+      requestId
     };
   }
   if (isFastApiValidationError(body)) {
@@ -109,13 +112,14 @@ function normalizeError(status: number, body: unknown): ApiErrorBody {
       status,
       code: "VALIDATION_ERROR",
       message: "场景或请求数据未通过后端校验",
-      details: body.detail
+      details: body.detail,
+      requestId
     };
   }
-  if (status === 404) return { status, code: "NOT_FOUND", message: "请求的资源不存在", details: body };
-  if (status === 409) return { status, code: "CONFLICT", message: "当前步骤顺序不允许执行该操作", details: body };
-  if (status === 422) return { status, code: "UNPROCESSABLE_ENTITY", message: "场景验证失败", details: body };
-  return { status, code: "SERVER_ERROR", message: "后端服务返回错误", details: body };
+  if (status === 404) return { status, code: "NOT_FOUND", message: "请求的资源不存在", details: body, requestId };
+  if (status === 409) return { status, code: "CONFLICT", message: "当前步骤顺序不允许执行该操作", details: body, requestId };
+  if (status === 422) return { status, code: "UNPROCESSABLE_ENTITY", message: "场景验证失败", details: body, requestId };
+  return { status, code: "SERVER_ERROR", message: "后端服务返回错误", details: body, requestId };
 }
 
 function isErrorEnvelope(value: unknown): value is { error: { code: unknown; message: unknown } } {

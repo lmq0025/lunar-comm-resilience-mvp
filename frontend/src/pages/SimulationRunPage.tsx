@@ -220,6 +220,12 @@ function SimulationRunContent() {
           <Tag color={statusColor(afterHealingStatus)}>自愈后：{afterHealingStatus}</Tag>
           <Tag color={statusColor(indicatorVerificationStatus)}>指标验证：{indicatorVerificationStatus}</Tag>
           {sessionId ? <Tag>Session {sessionId.slice(0, 8)}</Tag> : null}
+          {postActionTopology ? (
+            <Tag color="warning">第 6 步无效路径 {Object.values(postActionRoutes).filter((route) => !route.valid).length}</Tag>
+          ) : null}
+          {healedRouteStatus === CALCULATED ? (
+            <Tag color="success">第 7 步备用有效路径 {Object.values(healedRoutes).filter((route) => route.valid && route.route_source === "reroute_backup_path").length}</Tag>
+          ) : null}
           {error ? <Tag color="error">{error}</Tag> : null}
         </Space>
         <Typography.Paragraph type="secondary" className="snapshot-note">
@@ -979,7 +985,7 @@ function IndicatorResults({
           { title: "验证方法", dataIndex: "verification_method" }
         ]}
       />
-      <Card size="small" title="成果文件">
+      <Card size="small" title={`成果文件 ${artifacts.length} 个`}>
         <Button onClick={() => void download("__bundle__")} disabled={!sessionId}>下载全部 ZIP</Button>
         <Table
           size="small"

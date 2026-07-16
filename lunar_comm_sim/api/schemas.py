@@ -143,6 +143,18 @@ class HealthResponse(BaseModel):
     version: str
 
 
+class DiagnosticsResponse(BaseModel):
+    application_version: str
+    database_status: str
+    database_path: str
+    app_data_dir: str
+    runs_dir: str
+    frontend_dist_exists: bool
+    auth_mode: str
+    job_manager_status: str
+    current_time: str
+
+
 class CatalogItemResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -546,6 +558,11 @@ class VerifyIndicatorsStepResponse(BaseModel):
 class DeleteSessionResponse(BaseModel):
     deleted: bool
     session_id: str
+
+
+class DeleteProjectResponse(BaseModel):
+    deleted: bool
+    project_id: str
 
 
 class ErrorDetailResponse(BaseModel):

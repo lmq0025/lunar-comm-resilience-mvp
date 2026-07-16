@@ -8,7 +8,13 @@ const server = await createServer({
   plugins: [react()],
   server: {
     host: "127.0.0.1",
-    port: frontendPort
+    port: frontendPort,
+    proxy: {
+      "/api/v1": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true
+      }
+    }
   }
 });
 

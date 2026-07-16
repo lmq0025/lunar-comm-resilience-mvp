@@ -1,8 +1,22 @@
 import { create } from "zustand";
+import { ApiClientError } from "../api/client";
 import type { ProjectResponse, ScenarioValidationResponse } from "../api/contracts";
-import { createProjectDocument, listProjects, updateProjectDocument } from "../api/projects";
-import type { EditorViewport, LunarProjectDocument, ValidationStatus } from "../types/project";
-import { cloneProject, listProjectItems, loadActiveProjectId, loadProjects, saveActiveProjectId, saveProjects } from "../utils/storage";
+import {
+  copyProjectDocument,
+  createProjectDocument,
+  deleteProjectDocument,
+  listProjects,
+  updateProjectDocument
+} from "../api/projects";
+import type { EditorViewport, LunarProjectDocument, ProjectSaveStatus, ValidationStatus } from "../types/project";
+import {
+  cloneProject,
+  listProjectItems,
+  loadActiveProjectId,
+  loadDraftProject,
+  saveActiveProjectId,
+  saveDraftProject
+} from "../utils/storage";
 import { createBlankScenario } from "../utils/scenarioTemplates";
 
 interface ProjectStoreState {
@@ -10,16 +24,23 @@ interface ProjectStoreState {
   activeProjectId: string | null;
   draftProject: LunarProjectDocument | null;
   dirty: boolean;
+  saveStatus: ProjectSaveStatus;
+  saveError: string | null;
+  saveRequestId: string | null;
+  loadingProjects: boolean;
   validationStatus: ValidationStatus;
   validationResult: ScenarioValidationResponse | null;
   loadFromStorage: () => void;
+  loadLocalDraft: () => void;
+  loadFromBackend: () => Promise<void>;
   createProject: (name: string, description: string) => LunarProjectDocument;
   openProject: (projectId: string) => void;
-  saveCurrent: () => void;
-  saveAs: (name: string, description: string) => LunarProjectDocument | null;
-  duplicateProject: (projectId: string) => LunarProjectDocument;
-  renameProject: (projectId: string, name: string, description: string) => void;
-  deleteProject: (projectId: string) => void;
+  saveCurrent: () => Promise<LunarProjectDocument | null>;
+  retrySave: () => Promise<LunarProjectDocument | null>;
+  saveAs: (name: string, description: string) => Promise<LunarProjectDocument | null>;
+  duplicateProject: (projectId: string) => Promise<LunarProjectDocument>;
+  renameProject: (projectId: string, name: string, description: string) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
   importProject: (project: LunarProjectDocument) => LunarProjectDocument;
   updateDraftScenario: (updater: (scenario: LunarProjectDocument["scenario"]) => LunarProjectDocument["scenario"]) => void;
   updateDraftEditor: (updater: (editor: LunarProjectDocument["editor"]) => LunarProjectDocument["editor"]) => void;
@@ -29,32 +50,65 @@ interface ProjectStoreState {
   getCurrentScenario: () => LunarProjectDocument["scenario"] | null;
 }
 
+const NOT_VALIDATED = "未验证" as ValidationStatus;
+
 export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   projects: [],
   activeProjectId: null,
   draftProject: null,
   dirty: false,
-  validationStatus: "未验证",
+  saveStatus: "未保存",
+  saveError: null,
+  saveRequestId: null,
+  loadingProjects: false,
+  validationStatus: NOT_VALIDATED,
   validationResult: null,
 
-  loadFromStorage: () => {
-    const projects = loadProjects();
-    const activeProjectId = loadActiveProjectId();
-    const activeProject = projects.find((project) => project.projectId === activeProjectId) ?? null;
+  loadFromStorage: () => get().loadLocalDraft(),
+
+  loadLocalDraft: () => {
+    const draft = loadDraftProject();
+    if (!draft) return;
+    const normalized = normalizeEditor(cloneProject(draft));
     set({
-      projects,
-      activeProjectId: activeProject?.projectId ?? null,
-      draftProject: activeProject ? normalizeEditor(cloneProject(activeProject)) : null,
-      dirty: false,
-      validationStatus: "未验证",
+      activeProjectId: normalized.projectId,
+      draftProject: normalized,
+      dirty: true,
+      saveStatus: "仅保存在本地草稿",
+      saveError: null,
+      saveRequestId: null,
+      validationStatus: NOT_VALIDATED,
       validationResult: null
     });
-    void hydrateProjectsFromBackend();
+  },
+
+  loadFromBackend: async () => {
+    set({ loadingProjects: true });
+    try {
+      const response = await listProjects();
+      const backendProjects = response.projects.map(projectFromBackend);
+      const preferredId = loadActiveProjectId();
+      const active = backendProjects.find((project) => project.projectId === preferredId) ?? backendProjects[0] ?? null;
+      set({
+        projects: backendProjects,
+        activeProjectId: active?.projectId ?? null,
+        draftProject: active ? cloneProject(active) : null,
+        dirty: false,
+        saveStatus: active ? "已保存到数据库" : "未保存",
+        saveError: null,
+        saveRequestId: null,
+        loadingProjects: false
+      });
+      saveActiveProjectId(active?.projectId ?? null);
+    } catch (error) {
+      set({ loadingProjects: false });
+      throw error;
+    }
   },
 
   createProject: (name, description) => {
     const now = new Date().toISOString();
-    const project: LunarProjectDocument = {
+    const project: LunarProjectDocument = normalizeEditor({
       schemaVersion: "1.0",
       projectId: crypto.randomUUID(),
       name,
@@ -63,15 +117,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       updatedAt: now,
       scenario: createBlankScenario(name),
       editor: { nodeTypeCounters: {} }
-    };
-    saveActiveProjectId(project.projectId);
-    set({
-      activeProjectId: project.projectId,
-      draftProject: project,
-      dirty: true,
-      validationStatus: "未验证",
-      validationResult: null
     });
+    setDraft(set, project, "未保存");
     return project;
   },
 
@@ -79,169 +126,168 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     const project = get().projects.find((item) => item.projectId === projectId);
     if (!project) return;
     saveActiveProjectId(projectId);
+    saveDraftProject(null);
     set({
       activeProjectId: projectId,
       draftProject: normalizeEditor(cloneProject(project)),
       dirty: false,
-      validationStatus: "未验证",
+      saveStatus: "已保存到数据库",
+      saveError: null,
+      saveRequestId: null,
+      validationStatus: NOT_VALIDATED,
       validationResult: null
     });
   },
 
-  saveCurrent: () => {
+  saveCurrent: async () => {
     const draft = get().draftProject;
-    if (!draft) return;
-    const saved = { ...normalizeEditor(cloneProject(draft)), updatedAt: new Date().toISOString() };
-    const nextProjects = upsertProject(get().projects, saved);
-    saveProjects(nextProjects);
-    saveActiveProjectId(saved.projectId);
-    set({
-      projects: nextProjects,
-      activeProjectId: saved.projectId,
-      draftProject: cloneProject(saved),
-      dirty: false
-    });
-    void persistProjectToBackend(saved).then((persisted) => {
-      if (!persisted) return;
-      const refreshed = { ...saved, revision: persisted.revision, projectId: persisted.project_id, updatedAt: persisted.updated_at };
-      const existing = useProjectStore.getState().projects.filter((project) => project.projectId !== saved.projectId);
-      const refreshedProjects = upsertProject(existing, refreshed);
-      saveProjects(refreshedProjects);
-      saveActiveProjectId(refreshed.projectId);
-      useProjectStore.setState({ projects: refreshedProjects, activeProjectId: refreshed.projectId, draftProject: cloneProject(refreshed) });
-    });
+    if (!draft) return null;
+    set({ saveStatus: "保存中", saveError: null, saveRequestId: null });
+    try {
+      const response = draft.revision
+        ? await updateProjectDocument(draft.projectId, projectUpdatePayload(draft))
+        : await createProjectDocument(projectCreatePayload(draft));
+      const saved = projectFromBackend(response);
+      const projects = upsertProject(get().projects, saved);
+      saveActiveProjectId(saved.projectId);
+      saveDraftProject(null);
+      set({
+        projects,
+        activeProjectId: saved.projectId,
+        draftProject: cloneProject(saved),
+        dirty: false,
+        saveStatus: "已保存到数据库",
+        saveError: null,
+        saveRequestId: null
+      });
+      return saved;
+    } catch (error) {
+      const current = get().draftProject;
+      if (current) saveDraftProject(current);
+      const apiError = error instanceof ApiClientError ? error : null;
+      set({
+        dirty: true,
+        saveStatus: apiError?.body.status === 0 ? "仅保存在本地草稿" : "保存失败",
+        saveError: error instanceof Error ? error.message : "项目保存失败",
+        saveRequestId: apiError?.body.requestId ?? null
+      });
+      return null;
+    }
   },
 
-  saveAs: (name, description) => {
+  retrySave: async () => get().saveCurrent(),
+
+  saveAs: async (name, description) => {
     const draft = get().draftProject;
     if (!draft) return null;
     const now = new Date().toISOString();
-    const copied: LunarProjectDocument = {
+    const copy: LunarProjectDocument = {
       ...normalizeEditor(cloneProject(draft)),
       projectId: crypto.randomUUID(),
+      revision: undefined,
       name,
       description,
       createdAt: now,
       updatedAt: now
     };
-    const nextProjects = [...get().projects, copied];
-    saveProjects(nextProjects);
-    saveActiveProjectId(copied.projectId);
-    set({
-      projects: nextProjects,
-      activeProjectId: copied.projectId,
-      draftProject: cloneProject(copied),
-      dirty: false,
-      validationStatus: "未验证",
-      validationResult: null
+    setDraft(set, copy, "未保存");
+    return get().saveCurrent();
+  },
+
+  duplicateProject: async (projectId) => {
+    const response = await copyProjectDocument(projectId);
+    const copied = projectFromBackend(response);
+    set({ projects: upsertProject(get().projects, copied) });
+    return copied;
+  },
+
+  renameProject: async (projectId, name, description) => {
+    const project = get().projects.find((item) => item.projectId === projectId);
+    if (!project?.revision) throw new Error("项目不存在");
+    const response = await updateProjectDocument(projectId, {
+      expected_revision: project.revision,
+      name,
+      description
     });
-    return copied;
-  },
-
-  duplicateProject: (projectId) => {
-    const source = get().projects.find((project) => project.projectId === projectId);
-    if (!source) throw new Error("项目不存在");
-    const now = new Date().toISOString();
-    const copied: LunarProjectDocument = {
-      ...normalizeEditor(cloneProject(source)),
-      projectId: crypto.randomUUID(),
-      name: `${source.name} - 副本`,
-      createdAt: now,
-      updatedAt: now
-    };
-    const nextProjects = [...get().projects, copied];
-    saveProjects(nextProjects);
-    set({ projects: nextProjects });
-    return copied;
-  },
-
-  renameProject: (projectId, name, description) => {
-    const nextProjects = get().projects.map((project) =>
-      project.projectId === projectId ? { ...project, name, description, updatedAt: new Date().toISOString() } : project
-    );
-    saveProjects(nextProjects);
+    const updated = projectFromBackend(response);
     set((state) => ({
-      projects: nextProjects,
-      draftProject: state.draftProject?.projectId === projectId ? { ...state.draftProject, name, description } : state.draftProject,
-      dirty: state.draftProject?.projectId === projectId ? true : state.dirty
+      projects: upsertProject(state.projects, updated),
+      draftProject: state.draftProject?.projectId === projectId ? cloneProject(updated) : state.draftProject,
+      dirty: state.draftProject?.projectId === projectId ? false : state.dirty,
+      saveStatus: state.draftProject?.projectId === projectId ? "已保存到数据库" : state.saveStatus
     }));
   },
 
-  deleteProject: (projectId) => {
-    const nextProjects = get().projects.filter((project) => project.projectId !== projectId);
-    saveProjects(nextProjects);
+  deleteProject: async (projectId) => {
+    await deleteProjectDocument(projectId);
+    const projects = get().projects.filter((project) => project.projectId !== projectId);
     const deletingActive = get().activeProjectId === projectId;
-    const nextActive = deletingActive ? nextProjects[0] ?? null : get().draftProject;
-    saveActiveProjectId(nextActive?.projectId ?? null);
+    const next = deletingActive ? projects[0] ?? null : get().draftProject;
+    saveActiveProjectId(next?.projectId ?? null);
+    if (deletingActive) saveDraftProject(null);
     set({
-      projects: nextProjects,
-      activeProjectId: nextActive?.projectId ?? null,
-      draftProject: nextActive ? normalizeEditor(cloneProject(nextActive)) : null,
+      projects,
+      activeProjectId: next?.projectId ?? null,
+      draftProject: next ? normalizeEditor(cloneProject(next)) : null,
       dirty: false,
-      validationStatus: "未验证",
+      saveStatus: next ? "已保存到数据库" : "未保存",
+      saveError: null,
+      saveRequestId: null,
+      validationStatus: NOT_VALIDATED,
       validationResult: null
     });
   },
 
   importProject: (project) => {
     const now = new Date().toISOString();
-    const existingNames = new Set(get().projects.map((item) => item.name));
-    const imported: LunarProjectDocument = normalizeEditor({
+    const imported = normalizeEditor({
       ...cloneProject(project),
       projectId: crypto.randomUUID(),
-      name: existingNames.has(project.name) ? `${project.name} - 导入` : project.name,
+      revision: undefined,
       createdAt: now,
       updatedAt: now
     });
-    const nextProjects = [...get().projects, imported];
-    saveProjects(nextProjects);
-    saveActiveProjectId(imported.projectId);
-    set({
-      projects: nextProjects,
-      activeProjectId: imported.projectId,
-      draftProject: cloneProject(imported),
-      dirty: false,
-      validationStatus: "未验证",
-      validationResult: null
-    });
+    setDraft(set, imported, "未保存");
     return imported;
   },
 
   updateDraftScenario: (updater) => {
     const draft = get().draftProject;
     if (!draft) return;
+    const updated = { ...draft, scenario: updater(draft.scenario) };
+    saveDraftProject(updated);
     set({
-      draftProject: { ...draft, scenario: updater(draft.scenario) },
+      draftProject: updated,
       dirty: true,
-      validationStatus: get().validationStatus === "未验证" ? "未验证" : "验证结果已过期"
+      saveStatus: "未保存",
+      saveError: null,
+      saveRequestId: null
     });
   },
 
   updateDraftEditor: (updater) => {
     const draft = get().draftProject;
     if (!draft) return;
-    set({
-      draftProject: { ...draft, editor: updater(draft.editor) },
-      dirty: true,
-      validationStatus: get().validationStatus === "未验证" ? "未验证" : "验证结果已过期"
-    });
+    const updated = { ...draft, editor: updater(draft.editor) };
+    saveDraftProject(updated);
+    set({ draftProject: updated, dirty: true, saveStatus: "未保存" });
   },
 
   updateViewport: (viewport) => {
-    get().updateDraftEditor((editor) => ({ ...editor, viewport }));
+    const draft = get().draftProject;
+    if (!draft) return;
+    const updated = { ...draft, editor: { ...draft.editor, viewport } };
+    saveDraftProject(updated);
+    set({ draftProject: updated });
   },
 
   markDirty: () => {
-    set({
-      dirty: true,
-      validationStatus: get().validationStatus === "未验证" ? "未验证" : "验证结果已过期"
-    });
+    const draft = get().draftProject;
+    if (draft) saveDraftProject(draft);
+    set({ dirty: true, saveStatus: "未保存" });
   },
 
-  setValidation: (status, result) => {
-    set({ validationStatus: status, validationResult: result });
-  },
-
+  setValidation: (validationStatus, validationResult) => set({ validationStatus, validationResult }),
   getCurrentScenario: () => get().draftProject?.scenario ?? null
 }));
 
@@ -249,62 +295,71 @@ export function selectProjectItems() {
   return listProjectItems(useProjectStore.getState().projects);
 }
 
+function setDraft(
+  set: (patch: Partial<ProjectStoreState>) => void,
+  project: LunarProjectDocument,
+  saveStatus: ProjectSaveStatus
+): void {
+  saveActiveProjectId(project.projectId);
+  saveDraftProject(project);
+  set({
+    activeProjectId: project.projectId,
+    draftProject: cloneProject(project),
+    dirty: true,
+    saveStatus,
+    saveError: null,
+    saveRequestId: null,
+    validationStatus: NOT_VALIDATED,
+    validationResult: null
+  });
+}
+
 function upsertProject(projects: LunarProjectDocument[], project: LunarProjectDocument): LunarProjectDocument[] {
-  const exists = projects.some((item) => item.projectId === project.projectId);
-  return exists ? projects.map((item) => (item.projectId === project.projectId ? project : item)) : [...projects, project];
+  return projects.some((item) => item.projectId === project.projectId)
+    ? projects.map((item) => (item.projectId === project.projectId ? project : item))
+    : [...projects, project];
 }
 
 function normalizeEditor(project: LunarProjectDocument): LunarProjectDocument {
-  return {
+  const scenario = project.scenario;
+  const nodes = Array.isArray(scenario?.nodes) ? scenario.nodes : [];
+  const links = Array.isArray(scenario?.links) ? scenario.links : [];
+  const services = Array.isArray(scenario?.services) ? scenario.services : [];
+  const schedule = Array.isArray(scenario?.faults?.schedule) ? scenario.faults.schedule : [];
+  const faultEnabled = Array.isArray(scenario?.faults?.enabled) ? scenario.faults.enabled : [];
+  const healingEnabled = Array.isArray(scenario?.healing?.enabled) ? scenario.healing.enabled : [];
+  const indicators = Array.isArray(scenario?.technical_indicators) ? scenario.technical_indicators : [];
+  const normalized = {
     ...project,
+    scenario: {
+      ...scenario,
+      nodes,
+      links,
+      services,
+      faults: { enabled: faultEnabled, schedule },
+      healing: { enabled: healingEnabled },
+      technical_indicators: indicators
+    },
     editor: {
-      ...project.editor,
-      nodeTypeCounters: project.editor.nodeTypeCounters ?? inferNodeTypeCounters(project)
+      ...(project.editor ?? {}),
+      nodeTypeCounters: project.editor?.nodeTypeCounters ?? inferNodeTypeCounters(nodes)
     }
   };
+  return normalized as LunarProjectDocument;
 }
 
-async function hydrateProjectsFromBackend(): Promise<void> {
-  try {
-    const response = await listProjects();
-    if (!response.projects.length) return;
-    const backendProjects = response.projects.map(projectFromBackend);
-    const activeProjectId = loadActiveProjectId();
-    const activeProject =
-      backendProjects.find((project) => project.projectId === activeProjectId) ?? backendProjects[0] ?? null;
-    saveProjects(backendProjects);
-    saveActiveProjectId(activeProject?.projectId ?? null);
-    useProjectStore.setState({
-      projects: backendProjects,
-      activeProjectId: activeProject?.projectId ?? null,
-      draftProject: activeProject ? normalizeEditor(cloneProject(activeProject)) : null,
-      dirty: false
-    });
-  } catch {
-    // Backend persistence is best-effort for the draft UI; localStorage remains the offline cache.
-  }
+function projectCreatePayload(project: LunarProjectDocument) {
+  return { name: project.name, description: project.description, scenario: project.scenario, editor: project.editor };
 }
 
-async function persistProjectToBackend(project: LunarProjectDocument): Promise<ProjectResponse | null> {
-  try {
-    if (project.revision) {
-      return await updateProjectDocument(project.projectId, {
-        expected_revision: project.revision,
-        name: project.name,
-        description: project.description,
-        scenario: project.scenario,
-        editor: project.editor
-      });
-    }
-    return await createProjectDocument({
-      name: project.name,
-      description: project.description,
-      scenario: project.scenario,
-      editor: project.editor
-    });
-  } catch {
-    return null;
-  }
+function projectUpdatePayload(project: LunarProjectDocument) {
+  return {
+    expected_revision: project.revision,
+    name: project.name,
+    description: project.description,
+    scenario: project.scenario,
+    editor: project.editor
+  };
 }
 
 function projectFromBackend(project: ProjectResponse): LunarProjectDocument {
@@ -317,16 +372,15 @@ function projectFromBackend(project: ProjectResponse): LunarProjectDocument {
     createdAt: project.created_at,
     updatedAt: project.updated_at,
     scenario: project.scenario as LunarProjectDocument["scenario"],
-    editor: (project.editor ?? { nodeTypeCounters: {} }) as LunarProjectDocument["editor"]
+    editor: (project.editor ?? {}) as LunarProjectDocument["editor"]
   });
 }
 
-function inferNodeTypeCounters(project: LunarProjectDocument): Record<string, number> {
+function inferNodeTypeCounters(nodes: LunarProjectDocument["scenario"]["nodes"]): Record<string, number> {
   const counters: Record<string, number> = {};
-  project.scenario.nodes.forEach((node) => {
+  nodes.forEach((node) => {
     const match = new RegExp(`^${node.type}_(\\d+)$`).exec(node.id);
-    const current = counters[node.type] ?? 0;
-    counters[node.type] = match ? Math.max(current, Number(match[1])) : current;
+    counters[node.type] = Math.max(counters[node.type] ?? 0, match ? Number(match[1]) : 0);
   });
   return counters;
 }

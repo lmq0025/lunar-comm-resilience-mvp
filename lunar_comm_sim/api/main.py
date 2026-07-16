@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,8 @@ from lunar_comm_sim.api.schemas import (
     ClientErrorRequest,
     ClientErrorResponse,
     DeleteSessionResponse,
+    DeleteProjectResponse,
+    DiagnosticsResponse,
     ErrorResponse,
     ExecuteHealingStepResponse,
     GraphSnapshotResponse,
@@ -62,7 +65,7 @@ from lunar_comm_sim.api.schemas import (
 from lunar_comm_sim.api.serializers import json_safe
 from lunar_comm_sim.api.session_store import SessionNotFoundError, SimulationSessionStore
 from lunar_comm_sim.api.step_service import execute_step, session_summary, validate_scenario_payload
-from lunar_comm_sim.app_data import ensure_app_data_dirs
+from lunar_comm_sim.app_data import app_data_dir, database_path, ensure_app_data_dirs, runs_dir
 from lunar_comm_sim.core.faults import FAULT_LIBRARY
 from lunar_comm_sim.core.healing import HEALING_STRATEGIES
 from lunar_comm_sim.logging_config import configure_logging, log_client_error
@@ -169,6 +172,31 @@ def health() -> JSONResponse:
             "status": "ok",
             "application": "lunar-communication-resilience-platform",
             "version": "0.2.0",
+        },
+    )
+
+
+@app.get("/api/v1/diagnostics", response_model=DiagnosticsResponse)
+def diagnostics() -> JSONResponse:
+    _ensure_runtime_ready()
+    database_status = "ok"
+    try:
+        with session_scope() as session:
+            session.execute(select(User.id).limit(1)).first()
+    except Exception:
+        database_status = "error"
+    return _safe_response(
+        DiagnosticsResponse,
+        {
+            "application_version": app.version,
+            "database_status": database_status,
+            "database_path": str(database_path()),
+            "app_data_dir": str(app_data_dir()),
+            "runs_dir": str(runs_dir()),
+            "frontend_dist_exists": _frontend_dist_dir().joinpath("index.html").is_file(),
+            "auth_mode": auth_mode(),
+            "job_manager_status": "running" if job_manager is not None else "not_started",
+            "current_time": datetime.now(timezone.utc).isoformat(),
         },
     )
 
@@ -327,13 +355,13 @@ def update_project(project_id: str, request: ProjectUpdateRequest, user: dict[st
         return _safe_response(ProjectResponse, project_to_dict(updated))
 
 
-@app.delete("/api/v1/projects/{project_id}", response_model=DeleteSessionResponse)
+@app.delete("/api/v1/projects/{project_id}", response_model=DeleteProjectResponse)
 def delete_project(project_id: str, user: dict[str, Any] = Depends(current_user)) -> JSONResponse:
     with session_scope() as session:
         project = _owned_project(session, project_id, user["user_id"])
         project.deleted = True
         add_audit_event(session, user_id=user["user_id"], action="project.delete", entity_type="project", entity_id=project.id)
-        return _safe_response(DeleteSessionResponse, {"deleted": True, "session_id": project_id})
+        return _safe_response(DeleteProjectResponse, {"deleted": True, "project_id": project_id})
 
 
 @app.post("/api/v1/projects/{project_id}/copy", response_model=ProjectResponse)
@@ -393,8 +421,8 @@ def create_session(request: SessionCreateRequest, user: dict[str, Any] = Depends
             scenario=scenario,
             project_id=request.project_id,
             project_revision=request.project_revision,
-            output_dir=state.output_dir,
         )
+        state.output_dir = Path(run.output_dir)
         add_audit_event(session, user_id=user["user_id"], action="run.create", entity_type="run", entity_id=run.id)
         return _safe_response(SessionSummaryResponse, _session_summary_with_run(state, run))
 

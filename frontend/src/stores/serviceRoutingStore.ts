@@ -1,19 +1,29 @@
 import { create } from "zustand";
 import type {
   ArtifactItemResponse,
+  AnalyzeFaultImpactStepResponse,
+  BuildTopologyStepResponse,
+  CalculateRoutesStepResponse,
+  ExecuteHealingStepResponse,
   FaultImpactSummaryResponse,
   FaultPayload,
   FaultRecordResponse,
   GraphSnapshotResponse,
   HealingActionResponse,
   IndicatorCheckResponse,
+  InjectFaultsStepResponse,
   MetricRowResponse,
   PhysicalModelMetricsResponse,
   PhysicalModelValidationItemResponse,
+  RecalculateRoutesStepResponse,
   RouteSnapshotItemResponse,
+  RunAfterHealingStepResponse,
+  RunNominalStepResponse,
   ScenarioPayload,
   ServicePayload,
-  ServiceSimulationResultResponse
+  ServiceSimulationResultResponse,
+  SimulationRunResponse,
+  VerifyIndicatorsStepResponse
 } from "../api/contracts";
 import { ApiClientError } from "../api/client";
 import { validateScenario } from "../api/scenarios";
@@ -84,6 +94,7 @@ export type RuntimeInvalidationReason =
 interface ServiceRoutingState {
   runtimeProjectId: string | null;
   sessionId: string | null;
+  runId: string | null;
   backendTopologyStatus: BackendTopologyStatus;
   routeStatus: RouteStatus;
   nominalStatus: NominalStatus;
@@ -167,6 +178,7 @@ interface ServiceRoutingState {
 
 const INITIAL_RUNTIME = {
   sessionId: null,
+  runId: null,
   backendTopologyStatus: NOT_BUILT as BackendTopologyStatus,
   routeStatus: NOT_CALCULATED as RouteStatus,
   nominalStatus: NOT_RUN as NominalStatus,
@@ -472,6 +484,7 @@ export const useServiceRoutingStore = create<ServiceRoutingState>((set, get) => 
       }
       set({
         sessionId: newlyCreatedSessionId,
+        runId: session.run_id ?? null,
         backendTopologyStatus: BUILT,
         routeStatus: NOT_CALCULATED,
         topologySnapshot: step.step_result.topology,
@@ -756,6 +769,115 @@ export const useServiceRoutingStore = create<ServiceRoutingState>((set, get) => 
     set({ artifacts: manifest.artifacts });
   }
 }));
+
+export function restorePersistedRun(run: SimulationRunResponse, sessionId = run.session_id): void {
+  const current = useServiceRoutingStore.getState();
+  const restored: Partial<ServiceRoutingState> = {
+    ...INITIAL_RUNTIME,
+    runtimeProjectId: run.project_id ?? null,
+    sessionId,
+    runId: run.run_id,
+    selectedServiceId: current.selectedServiceId,
+    operationSeq: current.operationSeq + 1,
+    artifacts: run.artifacts ?? [],
+    error: null
+  };
+
+  for (const persisted of [...run.steps].sort((left, right) => left.step_index - right.step_index)) {
+    switch (persisted.step_name) {
+      case "topology_built": {
+        const response = persisted.response as unknown as BuildTopologyStepResponse;
+        restored.backendTopologyStatus = BUILT;
+        restored.topologySnapshot = response.step_result.topology;
+        break;
+      }
+      case "nominal_routes_calculated": {
+        const response = persisted.response as unknown as CalculateRoutesStepResponse;
+        restored.backendTopologyStatus = BUILT;
+        restored.routeStatus = CALCULATED;
+        restored.topologySnapshot = response.step_result.topology;
+        restored.routes = response.step_result.routes;
+        break;
+      }
+      case "nominal_simulated": {
+        const response = persisted.response as unknown as RunNominalStepResponse;
+        restored.nominalStatus = COMPLETED;
+        restored.nominalServices = response.step_result.services;
+        restored.nominalMetrics = response.step_result.metrics;
+        restored.nominalTopology = response.step_result.topology;
+        restored.nominalRoutes = response.step_result.routes;
+        restored.physicalModelValidation = response.step_result.physical_model_validation;
+        restored.physicalModelMetrics = response.step_result.physical_model_metrics;
+        break;
+      }
+      case "faults_injected": {
+        const response = persisted.response as unknown as InjectFaultsStepResponse;
+        restored.faultInjectionStatus = INJECTED;
+        restored.faultRecords = response.step_result.fault_records;
+        restored.faultedRoutes = response.step_result.routes;
+        restored.faultedTopology = response.step_result.topology;
+        restored.selectedStage = "before_healing";
+        break;
+      }
+      case "fault_impact_analyzed": {
+        const response = persisted.response as unknown as AnalyzeFaultImpactStepResponse;
+        restored.faultImpactStatus = COMPLETED;
+        restored.beforeHealingServices = response.step_result.services;
+        restored.beforeHealingMetrics = response.step_result.metrics;
+        restored.faultImpact = response.step_result.fault_impact;
+        break;
+      }
+      case "healing_executed": {
+        const response = persisted.response as unknown as ExecuteHealingStepResponse;
+        restored.healingExecutionStatus = EXECUTED;
+        restored.nonRoutingHealingActions = response.step_result.healing_actions;
+        restored.allHealingActions = response.step_result.healing_actions;
+        restored.postActionTopology = response.step_result.topology;
+        restored.postActionRoutes = response.step_result.routes;
+        restored.pendingRouteRecalculation = response.step_result.pending_route_recalculation;
+        restored.selectedStage = "healing_actions";
+        break;
+      }
+      case "healed_routes_calculated": {
+        const response = persisted.response as unknown as RecalculateRoutesStepResponse;
+        restored.healedRouteStatus = CALCULATED;
+        restored.allHealingActions = response.step_result.healing_actions;
+        restored.healedTopology = response.step_result.topology;
+        restored.healedRoutes = response.step_result.routes;
+        restored.pendingRouteRecalculation = response.step_result.pending_route_recalculation;
+        restored.selectedStage = "after_healing";
+        break;
+      }
+      case "after_healing_simulated": {
+        const response = persisted.response as unknown as RunAfterHealingStepResponse;
+        restored.afterHealingStatus = COMPLETED;
+        restored.afterHealingServices = response.step_result.services;
+        restored.afterHealingMetrics = response.step_result.metrics;
+        restored.healedTopology = response.step_result.topology;
+        restored.healedRoutes = response.step_result.routes;
+        restored.allHealingActions = response.step_result.healing_actions;
+        restored.selectedStage = "three_stage_comparison";
+        break;
+      }
+      case "indicators_verified": {
+        const response = persisted.response as unknown as VerifyIndicatorsStepResponse;
+        restored.indicatorVerificationStatus = VERIFIED;
+        restored.indicatorChecks = response.step_result.indicators;
+        restored.indicatorSummary = {
+          applicableCount: response.step_result.applicable_count,
+          passedCount: response.step_result.passed_count,
+          failedCount: response.step_result.failed_count,
+          notApplicableCount: response.step_result.not_applicable_count
+        };
+        restored.artifacts = response.step_result.artifacts;
+        restored.selectedStage = "indicators";
+        break;
+      }
+    }
+  }
+
+  useServiceRoutingStore.setState(restored);
+}
 
 function clearDownstreamResults(): Partial<ServiceRoutingState> {
   return {

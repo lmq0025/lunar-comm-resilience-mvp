@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ClearOutlined,
   CopyOutlined,
@@ -9,7 +9,7 @@ import {
   UndoOutlined,
   ZoomInOutlined
 } from "@ant-design/icons";
-import { App, Button, Empty, Popconfirm, Space } from "antd";
+import { Alert, App, Button, Empty, Popconfirm, Space, Typography } from "antd";
 import {
   Background,
   Controls,
@@ -29,6 +29,7 @@ import { NodePalette } from "../features/topology/NodePalette";
 import { PropertyPanel } from "../features/topology/PropertyPanel";
 import { ValidationPanel } from "../features/topology/ValidationPanel";
 import { useProjectStore } from "../stores/projectStore";
+import { useConnectionStore } from "../stores/connectionStore";
 import { useTopologyEditorStore } from "../stores/topologyEditorStore";
 import { useUiStore } from "../stores/uiStore";
 import type { SelectedElement } from "../types/topology";
@@ -36,6 +37,8 @@ import { isEditableEventTarget } from "../utils/keyboard";
 
 export function TopologyEditorPage() {
   const draftProject = useProjectStore((state) => state.draftProject);
+  const dirty = useProjectStore((state) => state.dirty);
+  const connectionStatus = useConnectionStore((state) => state.status);
   const setActiveMenu = useUiStore((state) => state.setActiveMenu);
   const loadScenario = useTopologyEditorStore((state) => state.loadScenario);
   const loadedProjectId = useRef<string | null>(null);
@@ -50,7 +53,7 @@ export function TopologyEditorPage() {
   if (!draftProject) {
     return (
       <div className="empty-editor">
-        <Empty description="请先新建或打开项目">
+        <Empty description="请先新建或导入项目">
           <Button type="primary" onClick={() => setActiveMenu("projects")}>
             打开项目管理
           </Button>
@@ -60,16 +63,25 @@ export function TopologyEditorPage() {
   }
 
   return (
-    <ReactFlowProvider>
-      <TopologyEditorCanvas />
-    </ReactFlowProvider>
+    <>
+      <Typography.Title level={4}>拓扑编辑</Typography.Title>
+      {connectionStatus !== "connected" && dirty ? (
+        <Alert banner type="warning" showIcon message="当前显示本地草稿，部分后端功能暂不可用" />
+      ) : null}
+      <ReactFlowProvider>
+        <TopologyEditorCanvas />
+      </ReactFlowProvider>
+    </>
   );
 }
+
+const MULTI_SELECTION_KEYS = ["Control", "Shift", "Meta"];
 
 function TopologyEditorCanvas() {
   const { message } = App.useApp();
   const nodes = useTopologyEditorStore((state) => state.nodes);
   const edges = useTopologyEditorStore((state) => state.edges);
+  const warnings = useTopologyEditorStore((state) => state.warnings);
   const selected = useTopologyEditorStore((state) => state.selected);
   const selectedNodeIds = useTopologyEditorStore((state) => state.selectedNodeIds);
   const selectedEdgeIds = useTopologyEditorStore((state) => state.selectedEdgeIds);
@@ -146,13 +158,20 @@ function TopologyEditorCanvas() {
     });
   };
 
-  const onConnect = (connection: Connection) => {
+  const onConnect = useCallback((connection: Connection) => {
     if (!connection.source || !connection.target) return;
     setPendingConnection({ source: connection.source, target: connection.target });
-  };
+  }, []);
 
-  const onNodeClick: NodeMouseHandler = (_, node) => selectElement({ kind: "node", id: node.id });
-  const onEdgeClick: EdgeMouseHandler = (_, edge) => selectElement({ kind: "edge", id: edge.id });
+  const onNodeClick: NodeMouseHandler = useCallback((_, node) => selectElement({ kind: "node", id: node.id }), [selectElement]);
+  const onEdgeClick: EdgeMouseHandler = useCallback((_, edge) => selectElement({ kind: "edge", id: edge.id }), [selectElement]);
+  const onSelectionChange = useCallback(
+    ({ nodes: selectedNodes, edges: selectedEdges }: { nodes: Array<{ id: string }>; edges: Array<{ id: string }> }) => {
+      selectMany(selectedNodes.map((node) => node.id), selectedEdges.map((edge) => edge.id));
+    },
+    [selectMany]
+  );
+  const onPaneClick = useCallback(() => selectElement(null), [selectElement]);
   const initialViewport = draftProject?.editor.viewport;
   const locateElement = (selection: SelectedElement) => {
     const node = nodes.find((item) => item.id === selection.id);
@@ -170,6 +189,8 @@ function TopologyEditorCanvas() {
         <ValidationPanel validating={validationMutation.isPending} onValidate={validateCurrentScenario} onLocate={locateElement} />
       </aside>
       <section className="canvas-section">
+        {nodes.length === 0 ? <Alert type="info" showIcon message="当前项目没有通信节点" /> : null}
+        {warnings.length ? <Alert type="warning" showIcon message="拓扑数据已容错加载" description={warnings.join("；")} /> : null}
         <div className="canvas-toolbar">
           <Space wrap>
             <Button icon={<UndoOutlined />} onClick={undo} />
@@ -196,10 +217,10 @@ function TopologyEditorCanvas() {
             <Button
               type="primary"
               icon={<SaveOutlined />}
-              onClick={() => {
-                saveCurrent();
-                message.success("项目已保存");
-              }}
+              onClick={() => void saveCurrent().then((saved) => {
+                if (saved) message.success("项目已保存到数据库");
+                else message.error(useProjectStore.getState().saveError ?? "项目保存失败");
+              })}
             >
               保存
             </Button>
@@ -229,17 +250,15 @@ function TopologyEditorCanvas() {
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
-            onSelectionChange={({ nodes: selectedNodes, edges: selectedEdges }) =>
-              selectMany(selectedNodes.map((node) => node.id), selectedEdges.map((edge) => edge.id))
-            }
-            onPaneClick={() => selectElement(null)}
+            onSelectionChange={onSelectionChange}
+            onPaneClick={onPaneClick}
             onNodeDragStart={beginNodeDrag}
             onNodeDragStop={(_, node) => finishNodeDrag(node.id, node.position)}
             onMoveEnd={(_, viewport: Viewport) => updateViewport(viewport)}
             defaultViewport={initialViewport}
             fitView={!initialViewport}
             selectionOnDrag
-            multiSelectionKeyCode={["Control", "Shift", "Meta"]}
+            multiSelectionKeyCode={MULTI_SELECTION_KEYS}
           >
             <Background />
             <Controls />

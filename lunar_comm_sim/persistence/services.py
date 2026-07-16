@@ -194,15 +194,16 @@ def create_run(
     project_revision: int | None = None,
     output_dir: Path | str | None = None,
 ) -> SimulationRun:
+    run_id = str(uuid4())
     run = SimulationRun(
-        id=str(uuid4()),
+        id=run_id,
         session_id=session_id,
         project_id=project_id,
         project_revision=project_revision,
         owner_user_id=owner_user_id,
         scenario_name=scenario.get("scenario", {}).get("name") if isinstance(scenario.get("scenario"), dict) else None,
         scenario_json=json_dumps(scenario),
-        output_dir=str(output_dir) if output_dir is not None else str(runs_dir() / session_id),
+        output_dir=str(output_dir) if output_dir is not None else str(runs_dir() / run_id),
         status="running",
         current_step="created",
         completed_steps_json="[]",

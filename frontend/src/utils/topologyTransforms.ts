@@ -54,10 +54,30 @@ export function flowEdgeToScenarioLink(edge: TopologyFlowEdge): LinkPayload {
 }
 
 export function projectToEditorState(scenario: ScenarioPayload): TopologyEditorState {
+  const nodes = Array.isArray(scenario?.nodes) ? scenario.nodes.filter(isUsableNode) : [];
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const links = Array.isArray(scenario?.links)
+    ? scenario.links.filter((link) => isUsableLink(link) && nodeIds.has(link.source) && nodeIds.has(link.target))
+    : [];
   return {
-    nodes: scenario.nodes.map(scenarioNodeToFlowNode),
-    edges: scenario.links.map(scenarioLinkToFlowEdge)
+    nodes: nodes.map(scenarioNodeToFlowNode),
+    edges: links.map(scenarioLinkToFlowEdge)
   };
+}
+
+export function topologyWarnings(scenario: ScenarioPayload): string[] {
+  const rawNodes = Array.isArray(scenario?.nodes) ? scenario.nodes : [];
+  const rawLinks = Array.isArray(scenario?.links) ? scenario.links : [];
+  const nodes = rawNodes.filter(isUsableNode);
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const invalidNodeCount = rawNodes.length - nodes.length;
+  const invalidLinks = rawLinks.filter(
+    (link) => !isUsableLink(link) || !nodeIds.has(link.source) || !nodeIds.has(link.target)
+  );
+  const warnings: string[] = [];
+  if (invalidNodeCount) warnings.push(`已跳过 ${invalidNodeCount} 个字段不完整的节点`);
+  if (invalidLinks.length) warnings.push(`已跳过 ${invalidLinks.length} 条端点不存在或字段不完整的链路`);
+  return warnings;
 }
 
 export function editorStateToScenario(base: ScenarioPayload, state: TopologyEditorState): ScenarioPayload {
@@ -111,4 +131,19 @@ export function getEdgePayload(edge: TopologyFlowEdge): LinkPayload | null {
 
 function sameUndirectedPair(aSource: string, aTarget: string, bSource: string, bTarget: string): boolean {
   return (aSource === bSource && aTarget === bTarget) || (aSource === bTarget && aTarget === bSource);
+}
+
+function isUsableNode(value: unknown): value is NodePayload {
+  return typeof value === "object" && value !== null && "id" in value && typeof (value as { id?: unknown }).id === "string";
+}
+
+function isUsableLink(value: unknown): value is LinkPayload {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "source" in value &&
+    "target" in value &&
+    typeof (value as { source?: unknown }).source === "string" &&
+    typeof (value as { target?: unknown }).target === "string"
+  );
 }

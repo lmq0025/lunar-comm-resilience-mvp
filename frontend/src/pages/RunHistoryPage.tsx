@@ -5,7 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import { listRuns, restoreRunSession } from "../api/runs";
 import type { SimulationRunResponse } from "../api/contracts";
 import { useProjectStore } from "../stores/projectStore";
-import { useServiceRoutingStore } from "../stores/serviceRoutingStore";
+import { restorePersistedRun } from "../stores/serviceRoutingStore";
 import { useUiStore } from "../stores/uiStore";
 
 export function RunHistoryPage() {
@@ -39,11 +39,8 @@ export function RunHistoryPage() {
     setLoading(true);
     try {
       const response = await restoreRunSession(run.run_id);
-      useServiceRoutingStore.setState({
-        sessionId: response.session.session_id,
-        runtimeProjectId: response.session.project_id ?? null
-      });
-      message.success("Run session restored");
+      restorePersistedRun(response.run, response.session.session_id);
+      message.success("运行状态和各步骤结果已恢复");
       setActiveMenu("simulation");
     } catch (err) {
       message.error(err instanceof Error ? err.message : "Restore failed");
@@ -53,17 +50,17 @@ export function RunHistoryPage() {
   };
 
   const columns: ColumnsType<SimulationRunResponse> = [
-    { title: "Run", dataIndex: "run_id", ellipsis: true },
-    { title: "Scenario", dataIndex: "scenario_name", ellipsis: true },
-    { title: "Status", dataIndex: "status", render: (value) => <Tag color={value === "completed" ? "success" : "processing"}>{value}</Tag> },
-    { title: "Current step", dataIndex: "current_step" },
-    { title: "Steps", render: (_, run) => `${run.completed_steps.length}/9` },
-    { title: "Updated", dataIndex: "updated_at", render: (value) => new Date(value).toLocaleString() },
+    { title: "运行 ID", dataIndex: "run_id", ellipsis: true },
+    { title: "场景", dataIndex: "scenario_name", ellipsis: true },
+    { title: "状态", dataIndex: "status", render: (value) => <Tag color={value === "completed" ? "success" : "processing"}>{value}</Tag> },
+    { title: "当前步骤", dataIndex: "current_step" },
+    { title: "步骤", render: (_, run) => `${run.completed_steps.length}/9` },
+    { title: "更新时间", dataIndex: "updated_at", render: (value) => new Date(value).toLocaleString() },
     {
       title: "Action",
       render: (_, run) => (
         <Button size="small" icon={<RollbackOutlined />} onClick={() => restore(run)}>
-          Restore
+          恢复运行
         </Button>
       )
     }
@@ -72,9 +69,9 @@ export function RunHistoryPage() {
   return (
     <Space direction="vertical" size={16} className="page-stack">
       <Space align="center" className="page-title-row">
-        <Typography.Title level={3}>Run history</Typography.Title>
+        <Typography.Title level={3}>运行历史</Typography.Title>
         <Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>
-          Refresh
+          刷新
         </Button>
       </Space>
       {error ? <Alert type="error" message={error} showIcon /> : null}
@@ -85,7 +82,7 @@ export function RunHistoryPage() {
         dataSource={runs}
         pagination={{ pageSize: 8 }}
         onRow={(record) => ({ onClick: () => setSelected(record) })}
-        locale={{ emptyText: <Empty description="No persisted runs" /> }}
+        locale={{ emptyText: <Empty description="数据库中暂无历史运行" /> }}
       />
       {selected ? (
         <Descriptions bordered size="small" column={2}>

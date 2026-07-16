@@ -11,6 +11,10 @@ export function listProjects(): Promise<ProjectListResponse> {
   return requestJson<ProjectListResponse>("/projects");
 }
 
+export function getProjectDocument(projectId: string): Promise<ProjectResponse> {
+  return requestJson<ProjectResponse>(`/projects/${encodeURIComponent(projectId)}`);
+}
+
 export function createProjectDocument(payload: ProjectCreateRequest): Promise<ProjectResponse> {
   return requestJson<ProjectResponse>("/projects", {
     method: "POST",
@@ -32,8 +36,8 @@ export function copyProjectDocument(projectId: string, name?: string): Promise<P
   });
 }
 
-export function deleteProjectDocument(projectId: string): Promise<{ deleted: boolean; session_id: string }> {
-  return requestJson<{ deleted: boolean; session_id: string }>(`/projects/${encodeURIComponent(projectId)}`, {
+export function deleteProjectDocument(projectId: string): Promise<{ deleted: boolean; project_id: string }> {
+  return requestJson<{ deleted: boolean; project_id: string }>(`/projects/${encodeURIComponent(projectId)}`, {
     method: "DELETE"
   });
 }

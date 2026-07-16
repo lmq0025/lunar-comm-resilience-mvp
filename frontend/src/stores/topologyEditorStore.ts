@@ -9,6 +9,7 @@ import {
   isDuplicateLink,
   projectToEditorState,
   removeLinksForNode,
+  topologyWarnings,
   updateEdgePayload,
   updateNodePayload
 } from "../utils/topologyTransforms";
@@ -23,6 +24,7 @@ interface TopologyEditorStoreState extends TopologyEditorState {
   past: TopologyEditorState[];
   future: TopologyEditorState[];
   dragStartSnapshot: TopologyEditorState | null;
+  warnings: string[];
   loadScenario: (scenario: ScenarioPayload) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -57,10 +59,12 @@ export const useTopologyEditorStore = create<TopologyEditorStoreState>((set, get
   past: [],
   future: [],
   dragStartSnapshot: null,
+  warnings: [],
 
   loadScenario: (scenario) => {
     const state = projectToEditorState(scenario);
-    const hasScenarioCoordinates = scenario.nodes.some(
+    const scenarioNodes = Array.isArray(scenario?.nodes) ? scenario.nodes : [];
+    const hasScenarioCoordinates = scenarioNodes.some(
       (node) => typeof node.position_x === "number" && typeof node.position_y === "number"
     );
     const laidOut = hasScenarioCoordinates ? state.nodes : autoLayout(state.nodes, state.edges);
@@ -73,7 +77,8 @@ export const useTopologyEditorStore = create<TopologyEditorStoreState>((set, get
       primarySelection: null,
       past: [],
       future: [],
-      dragStartSnapshot: null
+      dragStartSnapshot: null,
+      warnings: topologyWarnings(scenario)
     });
   },
 
@@ -298,6 +303,8 @@ export const useTopologyEditorStore = create<TopologyEditorStoreState>((set, get
   },
 
   selectMany: (nodeIds, edgeIds) => {
+    const state = get();
+    if (sameIds(state.selectedNodeIds, nodeIds) && sameIds(state.selectedEdgeIds, edgeIds)) return;
     const primarySelection =
       nodeIds[0] ? { kind: "node" as const, id: nodeIds[0] } : edgeIds[0] ? { kind: "edge" as const, id: edgeIds[0] } : null;
     set({
@@ -431,4 +438,8 @@ function simulationSignature(scenario: ScenarioPayload) {
 
 function withoutNodePosition(node: ScenarioPayload["nodes"][number]) {
   return Object.fromEntries(Object.entries(node).filter(([key]) => key !== "position_x" && key !== "position_y"));
+}
+
+function sameIds(current: string[], next: string[]): boolean {
+  return current.length === next.length && current.every((id, index) => id === next[index]);
 }

@@ -1,63 +1,121 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import YAML from "yaml";
 
 const e2eDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(e2eDir, "..", "..");
-const scenario = YAML.parse(fs.readFileSync(path.join(repoRoot, "configs", "default_scenario.yaml"), "utf8"));
+const scenarioPath = path.join(repoRoot, "configs", "default_scenario.yaml");
+const evidenceDir = path.join(repoRoot, "outputs", "round6_1_evidence");
 
-interface RouteLike {
-  route_source?: string;
-  valid?: boolean;
-}
+test.describe.serial("Round 6.1 production UI", () => {
+  let context: BrowserContext;
+  let page: Page;
+  const browserErrors: string[] = [];
 
-test("default scenario completes nine backend steps through Chromium", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByText("Lunar Communication Resilience Platform")).toBeVisible();
+  test.beforeAll(async ({ browser }) => {
+    fs.mkdirSync(evidenceDir, { recursive: true });
+    context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, acceptDownloads: true });
+    page = await context.newPage();
+    page.on("pageerror", (error) => browserErrors.push(error.stack ?? error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") browserErrors.push(message.text());
+    });
+  });
 
-  const apiBase = `http://127.0.0.1:${process.env.LUNAR_E2E_API_PORT ?? "8891"}/api/v1`;
-  const result = await page.evaluate(async ({ rawScenario, apiBaseUrl }) => {
-    async function post(path: string, body?: unknown) {
-      const response = await fetch(`${apiBaseUrl}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: body === undefined ? undefined : JSON.stringify(body)
-      });
-      if (!response.ok) throw new Error(`${path} ${response.status}: ${await response.text()}`);
-      return response.json();
+  test.afterAll(async () => {
+    await context.close();
+  });
+
+  test("启动和连接", async () => {
+    await page.goto("/", { waitUntil: "networkidle" });
+    await expect(page.getByText("后端已连接", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/Disconnected|Backend Disconnected/)).toHaveCount(0);
+    await expect(page.getByText(/Interface error|界面发生错误/)).toHaveCount(0);
+    await page.screenshot({ path: path.join(evidenceDir, "connection_connected.png"), fullPage: true });
+  });
+
+  test("导入默认场景并保存到 SQLite", async () => {
+    await page.getByRole("menuitem", { name: /项目管理/ }).click();
+    const chooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /导入项目\/场景/ }).click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles(scenarioPath);
+
+    await expect(page.getByText("未保存", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Nodes 12", { exact: true })).toBeVisible();
+    await expect(page.getByText("Links 20", { exact: true })).toBeVisible();
+    await expect(page.getByText("Services 4", { exact: true })).toBeVisible();
+    await expect(page.getByText("Faults 4", { exact: true })).toBeVisible();
+    await expect(page.getByText("Healing 5", { exact: true })).toBeVisible();
+    await expect(page.getByText("Indicators 14", { exact: true })).toBeVisible();
+    await expect(page.getByText("界面发生错误")).toHaveCount(0);
+    await page.screenshot({ path: path.join(evidenceDir, "topology_12_nodes_20_links.png"), fullPage: true });
+
+    await page.getByRole("button", { name: "保存项目" }).first().click();
+    await expect(page.getByText("已保存到数据库", { exact: true }).first()).toBeVisible();
+    await page.reload({ waitUntil: "networkidle" });
+    await expect(page.getByText("已保存到数据库", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Nodes 12", { exact: true })).toBeVisible();
+  });
+
+  test("八个功能页面真实导航", async () => {
+    const pages = ["项目管理", "拓扑编辑", "业务配置", "故障计划", "自愈策略", "仿真运行", "结果分析", "运行历史"];
+    for (const title of pages) {
+      await page.getByRole("menuitem", { name: new RegExp(title) }).click();
+      await expect(page.locator(".ant-menu-item-selected")).toContainText(title);
+      await expect(page.getByRole("heading", { name: new RegExp(title) }).first()).toBeVisible();
+      await expect(page.getByText("界面发生错误")).toHaveCount(0);
     }
+  });
 
-    const validation = await post("/scenarios/validate", rawScenario);
-    const session = await post("/sessions", { scenario: rawScenario });
-    const endpoints = [
-      "build-topology",
-      "calculate-routes",
-      "run-nominal",
-      "inject-faults",
-      "analyze-fault-impact",
-      "execute-healing",
-      "recalculate-routes",
-      "run-after-healing",
-      "verify-indicators"
+  test("通过九个按钮完成默认场景", async () => {
+    await page.getByRole("menuitem", { name: /仿真运行/ }).click();
+    const labels = [
+      /构建拓扑/,
+      /计算路径/,
+      /运行正常状态/,
+      /注入故障/,
+      /分析故障影响/,
+      /执行自愈/,
+      /重新计算路径/,
+      /运行自愈后状态/,
+      /验证技术指标/
     ];
-    const steps: Record<string, unknown> = {};
-    for (const endpoint of endpoints) {
-      steps[endpoint] = await post(`/sessions/${session.session_id}/steps/${endpoint}`);
-    }
-    return { validation, session, steps };
-  }, { rawScenario: scenario, apiBaseUrl: apiBase });
 
-  expect(result.validation.valid).toBe(true);
-  expect(result.steps["execute-healing"].step_result.pending_route_recalculation).toBe(true);
-  const step6Routes = Object.values(result.steps["execute-healing"].step_result.routes) as RouteLike[];
-  expect(step6Routes.every((route) => route.route_source === "inherited_nominal" && !route.valid)).toBe(true);
-  expect(result.steps["recalculate-routes"].step_result.pending_route_recalculation).toBe(false);
-  const step7Routes = Object.values(result.steps["recalculate-routes"].step_result.routes) as RouteLike[];
-  expect(step7Routes.every((route) => route.route_source === "reroute_backup_path" && route.valid)).toBe(true);
-  expect(result.steps["run-after-healing"].step_result.services).toHaveLength(4);
-  expect(result.steps["verify-indicators"].step_result.applicable_count).toBe(14);
-  expect(result.steps["verify-indicators"].step_result.passed_count).toBe(14);
-  expect(result.steps["verify-indicators"].step_result.failed_count).toBe(0);
+    for (let index = 0; index < labels.length; index += 1) {
+      const button = page.getByRole("button", { name: labels[index] }).first();
+      await expect(button).toBeEnabled();
+      await button.click();
+      if (index < labels.length - 1) await expect(page.getByRole("button", { name: labels[index + 1] }).first()).toBeEnabled();
+      if (index === 5) {
+        await expect(page.getByText("第 6 步无效路径 4", { exact: true })).toBeVisible();
+        await page.screenshot({ path: path.join(evidenceDir, "step6_no_reroute.png"), fullPage: true });
+      }
+      if (index === 6) {
+        await expect(page.getByText("第 7 步备用有效路径 4", { exact: true })).toBeVisible();
+        await page.screenshot({ path: path.join(evidenceDir, "step7_backup_routes.png"), fullPage: true });
+      }
+    }
+
+    await expect(page.getByText("适用 14", { exact: true })).toBeVisible();
+    await expect(page.getByText("通过 14", { exact: true })).toBeVisible();
+    await expect(page.getByText("未通过 0", { exact: true })).toBeVisible();
+    await expect(page.getByText("成果文件 16 个", { exact: true })).toBeVisible();
+    await page.screenshot({ path: path.join(evidenceDir, "step9_14_of_14.png"), fullPage: true });
+  });
+
+  test("刷新后恢复完整结果和成果清单", async () => {
+    await page.reload({ waitUntil: "networkidle" });
+    await page.getByRole("menuitem", { name: /结果分析/ }).click();
+    await expect(page.getByText("适用 14", { exact: true })).toBeVisible();
+    await expect(page.getByText("通过 14", { exact: true })).toBeVisible();
+    await expect(page.getByText("成果文件 16 个", { exact: true })).toBeVisible();
+    await page.screenshot({ path: path.join(evidenceDir, "refresh_recovery.png"), fullPage: true });
+
+    await page.getByRole("menuitem", { name: /运行历史/ }).click();
+    await expect(page.getByText("9/9", { exact: true }).first()).toBeVisible();
+    await page.screenshot({ path: path.join(evidenceDir, "run_history.png"), fullPage: true });
+    expect(browserErrors.filter((error) => /Maximum update depth|Interface error|界面发生错误/.test(error))).toEqual([]);
+  });
 });

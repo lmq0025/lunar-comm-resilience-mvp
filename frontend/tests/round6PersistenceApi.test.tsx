@@ -65,7 +65,7 @@ describe("round 6 persistence api", () => {
     );
 
     expect(await screen.findByText("demo_scenario")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Restore/i }));
+    await userEvent.click(screen.getByRole("button", { name: /恢复运行/ }));
 
     await waitFor(() => {
       expect(useServiceRoutingStore.getState().sessionId).toBe("session-1");

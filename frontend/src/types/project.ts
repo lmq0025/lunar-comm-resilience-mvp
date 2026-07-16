@@ -21,6 +21,8 @@ export interface LunarProjectDocument {
   };
 }
 
+export type ProjectSaveStatus = "未保存" | "保存中" | "已保存到数据库" | "仅保存在本地草稿" | "保存失败";
+
 export interface ProjectListItem {
   projectId: string;
   name: string;

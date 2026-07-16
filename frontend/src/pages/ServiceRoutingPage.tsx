@@ -342,7 +342,10 @@ function ServiceRoutingContent() {
                 invalidationReason={lastInvalidationReason}
               />
               <TopologySnapshotSummary snapshot={topologySnapshot} />
-              <Button onClick={() => { saveCurrent(); message.success("项目已保存"); }}>保存项目</Button>
+              <Button onClick={() => void saveCurrent().then((saved) => {
+                if (saved) message.success("项目已保存到数据库");
+                else message.error(useProjectStore.getState().saveError ?? "项目保存失败");
+              })}>保存项目</Button>
             </Space>
           )}
         </Card>
