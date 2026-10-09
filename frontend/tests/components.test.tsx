@@ -8,7 +8,6 @@ import { NodePalette } from "../src/features/topology/NodePalette";
 import { PropertyPanel } from "../src/features/topology/PropertyPanel";
 import { ValidationPanel } from "../src/features/topology/ValidationPanel";
 import { BACKEND_FAULT_IDS, OFFLINE_FAULT_CATALOG } from "../src/features/simulation/faultCatalog";
-import { LINK_HIGH_AVAILABILITY_DISPLAY_THRESHOLD } from "../src/features/simulation/stageTopologyGraphModel";
 import { ServiceRoutingPage } from "../src/pages/ServiceRoutingPage";
 import { SimulationRunPage } from "../src/pages/SimulationRunPage";
 import { useProjectStore } from "../src/stores/projectStore";
@@ -134,8 +133,8 @@ describe("component rendering", () => {
 
     renderWithProviders(<ServiceRoutingPage />);
 
-    expect(screen.getAllByText("地面站（ground_station）").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/地面站（ground_station） -> 月轨中继器（lunar_orbiter）/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("地面站（内部 ID：ground_station）").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/地面站（内部 ID：ground_station） -> 月轨中继器（内部 ID：lunar_orbiter）/).length).toBeGreaterThan(0);
   });
 
   it("renders the staged simulation page with fault plan and snapshot-mode notice", async () => {
@@ -160,9 +159,10 @@ describe("component rendering", () => {
     seedCompletedSimulationPage();
     renderWithProviders(<SimulationRunPage />);
 
-    fireEvent.click(await screen.findByText("正常—故障对比"));
+    fireEvent.click(await screen.findByText("结果分析"));
 
-    expect(screen.getByText("故障影响总览")).toBeInTheDocument();
+    expect(screen.getByText("故障对象与主要后果")).toBeInTheDocument();
+    expect(screen.getByText("三阶段韧性恢复对比")).toBeInTheDocument();
     expect(screen.getAllByText("丢包率 正常").length).toBeGreaterThan(0);
     expect(screen.getAllByText("丢包率 故障后").length).toBeGreaterThan(0);
     expect(screen.getAllByText("丢包率 变化").length).toBeGreaterThan(0);
@@ -175,8 +175,8 @@ describe("component rendering", () => {
     expect(screen.getAllByText("中断时间 正常").length).toBeGreaterThan(0);
     expect(screen.getAllByText("中断时间 故障后").length).toBeGreaterThan(0);
     expect(screen.getAllByText("中断时间 变化").length).toBeGreaterThan(0);
-    expect(screen.getByText("传播真阳性数 (propagation_true_positive_count)")).toBeInTheDocument();
-    expect(screen.getAllByText("service_unreachable").length).toBeGreaterThan(0);
+    expect(screen.getByText("传播真阳性数（propagation_true_positive_count）")).toBeInTheDocument();
+    expect(screen.getAllByText("业务不可达").length).toBeGreaterThan(0);
   });
 
   it("shows topology, fault selection, tooltip details, type editing, and complete service result fields", async () => {
@@ -184,7 +184,7 @@ describe("component rendering", () => {
     renderWithProviders(<SimulationRunPage />);
 
     expect(await screen.findByText("正常拓扑快照")).toBeInTheDocument();
-    expect(screen.getByText(`橙色不代表链路失效。该链路仍可用并参与连通与路由计算，只是当前可用率低于显示阈值 ${LINK_HIGH_AVAILABILITY_DISPLAY_THRESHOLD}。`)).toBeInTheDocument();
+    expect(screen.getAllByText(/橙色表示性能退化，链路仍可能可用/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("可用率").length).toBeGreaterThan(0);
     expect(screen.getAllByText("中断时间").length).toBeGreaterThan(0);
     expect(screen.getAllByText("路由来源").length).toBeGreaterThan(0);
@@ -201,8 +201,8 @@ describe("component rendering", () => {
 
     fireEvent.click(screen.getByText("故障后、自愈前"));
     expect(screen.getByText("故障后、自愈前拓扑快照")).toBeInTheDocument();
-    expect(screen.getByText("失效节点/链路")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("正常状态"));
+    expect(screen.getAllByText("故障失效链路").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("tab", { name: "正常状态" })[0]);
 
     const typeSelect = document.querySelector(".fault-property-type-select .ant-select-selector");
     expect(typeSelect).toBeTruthy();

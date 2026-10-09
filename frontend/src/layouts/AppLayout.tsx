@@ -162,12 +162,12 @@ export function AppLayout() {
       </Layout>
       <Footer className="status-bar">
         <Space split={<span>/</span>} wrap>
-          <span>Nodes {safeLength(draftProject?.scenario?.nodes)}</span>
-          <span>Links {safeLength(draftProject?.scenario?.links)}</span>
-          <span>Services {safeLength(draftProject?.scenario?.services)}</span>
-          <span>Faults {safeLength(draftProject?.scenario?.faults?.schedule)}</span>
-          <span>Healing {safeLength(draftProject?.scenario?.healing?.enabled)}</span>
-          <span>Indicators {safeLength(draftProject?.scenario?.technical_indicators)}</span>
+          <span>节点 {safeLength(draftProject?.scenario?.nodes)}</span>
+          <span>链路 {safeLength(draftProject?.scenario?.links)}</span>
+          <span>业务 {safeLength(draftProject?.scenario?.services)}</span>
+          <span>故障 {safeLength(draftProject?.scenario?.faults?.schedule)}</span>
+          <span>自愈策略 {safeLength(draftProject?.scenario?.healing?.enabled)}</span>
+          <span>技术指标 {safeLength(draftProject?.scenario?.technical_indicators)}</span>
           <span><ApiOutlined /> {connectionStatusLabel[connectionStatus]}</span>
         </Space>
       </Footer>

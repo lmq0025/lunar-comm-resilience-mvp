@@ -1,0 +1,17 @@
+{
+  "dataset_kind": "historical_verified_experiment",
+  "title": "五级自愈策略消融实验",
+  "source_file": "data/baselines/healing_ablation_round7_runs.csv",
+  "source_config": "configs/experiments/healing_ablation.yaml",
+  "source_sha256": "1C5955A3A3B2164E91AB63B9C6244E19D3DEF2DF55216E3C975B23C6943E2868",
+  "verified_against": "outputs/final_demo/experiments/healing_ablation/runs.csv",
+  "verified_against_sha256": "E3F40E4FBAAF8EB3C0FCE8AAFFD8AA177D3A0A3134815F0B6D08B21FBD091F63",
+  "total_indicators": 14,
+  "rows": [
+    { "strategy_set": "no_healing", "indicator_pass_count": 5, "subnet_paralysis_probability": 1.0, "control_command_loss_rate": 1.0, "video_return_success_rate": 0.0, "science_data_interruption_s": 120.0, "relay_handover_delay_disturbance_ms": 120.0 },
+    { "strategy_set": "reroute_only", "indicator_pass_count": 8, "subnet_paralysis_probability": 0.0, "control_command_loss_rate": 0.000040850526500046946, "video_return_success_rate": 0.2727121996093101, "science_data_interruption_s": 38.18181818181819, "relay_handover_delay_disturbance_ms": 120.0 },
+    { "strategy_set": "reroute_plus_priority", "indicator_pass_count": 9, "subnet_paralysis_probability": 0.0, "control_command_loss_rate": 0.000009804126360011267, "video_return_success_rate": 0.2727121996093101, "science_data_interruption_s": 38.18181818181819, "relay_handover_delay_disturbance_ms": 120.0 },
+    { "strategy_set": "reroute_plus_priority_plus_degradation", "indicator_pass_count": 11, "subnet_paralysis_probability": 0.0, "control_command_loss_rate": 0.000009804126360011267, "video_return_success_rate": 0.9999447319008038, "science_data_interruption_s": 38.18181818181819, "relay_handover_delay_disturbance_ms": 120.0 },
+    { "strategy_set": "full_healing", "indicator_pass_count": 14, "subnet_paralysis_probability": 0.0, "control_command_loss_rate": 0.000009804126360011267, "video_return_success_rate": 0.9999447319008038, "science_data_interruption_s": 0.45499999999999996, "relay_handover_delay_disturbance_ms": 35.0 }
+  ]
+}

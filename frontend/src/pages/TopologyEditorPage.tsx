@@ -24,6 +24,10 @@ import {
 } from "@xyflow/react";
 import { useScenarioValidationMutation } from "../api/scenarios";
 import { lunarNodeTypes } from "../features/topology/nodeTypes";
+import { UnifiedLinkEdge } from "../features/topology/unified/UnifiedLinkEdge";
+import { TopologyLayerBands } from "../features/topology/unified/TopologyLayerBands";
+import { TopologyLegend } from "../features/topology/unified/TopologyLegend";
+import { CHINESE_REACT_FLOW_LABELS } from "../features/topology/unified/reactFlowLabels";
 import { NewLinkDialog, type PendingConnection } from "../features/topology/NewLinkDialog";
 import { NodePalette } from "../features/topology/NodePalette";
 import { PropertyPanel } from "../features/topology/PropertyPanel";
@@ -76,6 +80,7 @@ export function TopologyEditorPage() {
 }
 
 const MULTI_SELECTION_KEYS = ["Control", "Shift", "Meta"];
+const UNIFIED_EDGE_TYPES = { unifiedLink: UnifiedLinkEdge };
 
 function TopologyEditorCanvas() {
   const { message } = App.useApp();
@@ -198,7 +203,7 @@ function TopologyEditorCanvas() {
             <Button icon={<CopyOutlined />} onClick={duplicateSelectedNode} />
             <Button icon={<DeleteOutlined />} onClick={deleteSelected} />
             <Button icon={<LayoutOutlined />} onClick={runAutoLayout}>
-              自动布局
+              应用分层布局
             </Button>
             <Button
               icon={<ZoomInOutlined />}
@@ -241,10 +246,13 @@ function TopologyEditorCanvas() {
             addNode(type, `${type}_role`, position);
           }}
         >
+          <TopologyLayerBands />
           <ReactFlow
+            ariaLabelConfig={CHINESE_REACT_FLOW_LABELS}
             nodes={visibleNodes}
             edges={visibleEdges}
             nodeTypes={lunarNodeTypes}
+            edgeTypes={UNIFIED_EDGE_TYPES}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -264,6 +272,7 @@ function TopologyEditorCanvas() {
             <Controls />
             <MiniMap pannable zoomable />
           </ReactFlow>
+          <TopologyLegend />
         </div>
       </section>
       <aside className="right-panel">

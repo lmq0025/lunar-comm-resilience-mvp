@@ -1,6 +1,7 @@
 import type { Edge } from "@xyflow/react";
 import type { LinkPayload, NodePayload, ScenarioPayload } from "../api/contracts";
 import type { TopologyEditorState, TopologyFlowEdge, TopologyFlowNode } from "../types/topology";
+import { deterministicLayeredLayout, resolveNodePosition } from "../features/topology/unified/topologyLayout";
 
 export function scenarioNodeToFlowNode(node: NodePayload, index = 0): TopologyFlowNode {
   const x = typeof node.position_x === "number" ? node.position_x : 120 + (index % 4) * 190;
@@ -30,12 +31,13 @@ export function scenarioLinkToFlowEdge(link: LinkPayload, index = 0): TopologyFl
     id,
     source: link.source,
     target: link.target,
-    type: "default",
+    type: "unifiedLink",
     label: `${link.bandwidth_mbps} Mbps | ${link.delay_ms} ms | A=${link.availability}`,
     style: link.active === false ? { strokeDasharray: "6 5", stroke: "#9aa5ad" } : undefined,
     data: {
       payload: { ...link, id },
-      label: `${link.bandwidth_mbps} Mbps | ${link.delay_ms} ms | A=${link.availability}`
+      label: `${link.bandwidth_mbps} Mbps | ${link.delay_ms} ms | A=${link.availability}`,
+      visualState: link.active === false ? "failed" : "normal"
     }
   };
 }
@@ -59,8 +61,13 @@ export function projectToEditorState(scenario: ScenarioPayload): TopologyEditorS
   const links = Array.isArray(scenario?.links)
     ? scenario.links.filter((link) => isUsableLink(link) && nodeIds.has(link.source) && nodeIds.has(link.target))
     : [];
+  const layout = deterministicLayeredLayout(nodes);
   return {
-    nodes: nodes.map(scenarioNodeToFlowNode),
+    nodes: nodes.map((node, index) => {
+      const flowNode = scenarioNodeToFlowNode(node, index);
+      const point = resolveNodePosition(node, layout, true);
+      return { ...flowNode, position: { x: point.x, y: point.y } };
+    }),
     edges: links.map(scenarioLinkToFlowEdge)
   };
 }
@@ -119,7 +126,7 @@ export function updateEdgePayload(edges: TopologyFlowEdge[], edgeId: string, pay
           source: payload.source,
           target: payload.target,
           label: payload.name || payload.kind,
-          data: { payload, label: payload.name || payload.kind }
+          data: { payload, label: payload.name || payload.kind, visualState: payload.active === false ? "failed" : "normal" }
         }
       : edge
   );

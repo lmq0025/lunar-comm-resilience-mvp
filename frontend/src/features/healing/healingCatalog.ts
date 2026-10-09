@@ -1,4 +1,5 @@
 import type { CatalogItemResponse, ScenarioPayload } from "../../api/contracts";
+import { serviceDisplayName } from "../../i18n/displayNames";
 
 export const HEALING_STRATEGY_IDS = [
   "reroute_backup_path",
@@ -89,14 +90,14 @@ export function normalizeHealingEnabled(enabled: string[]): string[] {
 export function healingPreconditionHint(strategyId: string, scenario: ScenarioPayload): string {
   if (strategyId === "priority_scheduling") {
     const matched = scenario.services.filter((service) => ["control_command", "teleoperation"].includes(service.id));
-    return matched.length ? `检测到 ${matched.map((service) => service.id).join(", ")}` : "未检测到 control_command 或 teleoperation。";
+    return matched.length ? `检测到 ${matched.map((service) => `${serviceDisplayName(service)}（${service.id}）`).join("、")}` : "未检测到地月遥控指令或月面近实时遥操作业务。";
   }
   if (strategyId === "service_degradation") {
     const service = scenario.services.find((item) => item.id === "hd_video");
-    return service?.degraded_bandwidth_mbps != null ? `hd_video 已配置降级带宽 ${service.degraded_bandwidth_mbps} Mbps` : "未检测到 hd_video 的降级带宽配置。";
+    return service?.degraded_bandwidth_mbps != null ? `高清图像视频回传（hd_video）已配置降级带宽 ${service.degraded_bandwidth_mbps} Mbps` : "未检测到高清图像视频回传业务的降级带宽配置。";
   }
   if (strategyId === "store_and_forward") {
-    return scenario.services.some((service) => service.id === "science_data") ? "检测到 science_data 业务。" : "未检测到 science_data 业务。";
+    return scenario.services.some((service) => service.id === "science_data") ? "检测到科学探测数据回传（science_data）业务。" : "未检测到科学探测数据回传业务。";
   }
   if (strategyId === "relay_pre_handover") {
     return "需要在故障阶段存在中继切换扰动；最终以第 6 步自愈动作记录为准。";

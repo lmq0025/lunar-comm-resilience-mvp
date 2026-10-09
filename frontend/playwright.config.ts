@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 const frontendRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(frontendRoot, "..");
 const port = Number(process.env.LUNAR_E2E_API_PORT ?? "8891");
-const appDataDir = path.join(repoRoot, "outputs", "round6_1_playwright_app_data");
+const appDataDir = path.join(repoRoot, "outputs", "round7_playwright_app_data");
+const pythonExe = process.env.LUNAR_PYTHON_EXE ?? "E:\\ProgramData\\condaData\\envs_dirs\\lunar_comm_mvp\\python.exe";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -26,7 +27,7 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: `python -m uvicorn lunar_comm_sim.api.main:app --host 127.0.0.1 --port ${port}`,
+    command: `"${pythonExe}" -m uvicorn lunar_comm_sim.api.main:app --host 127.0.0.1 --port ${port}`,
     cwd: repoRoot,
     env: {
       ...process.env,

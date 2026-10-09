@@ -10,7 +10,7 @@ export interface ServicePreset {
 export const servicePresets: ServicePreset[] = [
   {
     id: "control_command",
-    label: "控制指令",
+    label: "地月遥控指令",
     description: "默认建议值，可编辑",
     values: {
       service_type: "control_command",
@@ -22,7 +22,7 @@ export const servicePresets: ServicePreset[] = [
   },
   {
     id: "teleoperation",
-    label: "遥操作",
+    label: "月面近实时遥操作",
     description: "默认建议值，可编辑",
     values: {
       service_type: "teleoperation",
@@ -34,7 +34,7 @@ export const servicePresets: ServicePreset[] = [
   },
   {
     id: "science_data",
-    label: "科学数据",
+    label: "科学探测数据回传",
     description: "默认建议值，可编辑",
     values: {
       service_type: "science_data",
@@ -46,7 +46,7 @@ export const servicePresets: ServicePreset[] = [
   },
   {
     id: "hd_video",
-    label: "高清影像",
+    label: "高清图像视频回传",
     description: "默认建议值，可编辑",
     values: {
       service_type: "hd_video",

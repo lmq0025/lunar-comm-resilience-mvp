@@ -26,7 +26,28 @@ import type {
 } from "../api/contracts";
 import { faultCatalogItems, faultCatalogMap } from "../features/simulation/faultCatalog";
 import { formatSimulationNumber, finiteNumber } from "../features/simulation/formatters";
-import { StageTopologyGraph } from "../features/simulation/StageTopologyGraph";
+import { UnifiedStageTopologyGraph as StageTopologyGraph } from "../features/simulation/UnifiedStageTopologyGraph";
+import { UnifiedLunarNetworkGraph } from "../features/topology/unified/UnifiedLunarNetworkGraph";
+import { HealingAblationPanel } from "../features/results/HealingAblationPanel";
+import { PropagationCauseChain } from "../features/results/PropagationCauseChain";
+import { ThreeStageRecoveryPanel } from "../features/results/ThreeStageRecoveryPanel";
+import { PathComparisonPanel } from "../features/results/PathComparisonPanel";
+import {
+  artifactPurpose,
+  engineeringTextDisplayName,
+  faultDisplayName,
+  healingDisplayName,
+  indicatorDisplayMeta,
+  metricDisplayName,
+  nodeDisplayName,
+  propagationEventDisplayName,
+  referenceSourceDisplayName,
+  routeSourceDisplayName,
+  serviceDisplayName,
+  stageDisplayName,
+  statusDisplayName,
+  unitDisplayName
+} from "../i18n/displayNames";
 import { useProjectStore } from "../stores/projectStore";
 import { useServiceRoutingStore, type SelectedStage } from "../stores/serviceRoutingStore";
 
@@ -219,7 +240,7 @@ function SimulationRunContent() {
           <Tag color={statusColor(healedRouteStatus)}>恢复路径：{healedRouteStatus}</Tag>
           <Tag color={statusColor(afterHealingStatus)}>自愈后：{afterHealingStatus}</Tag>
           <Tag color={statusColor(indicatorVerificationStatus)}>指标验证：{indicatorVerificationStatus}</Tag>
-          {sessionId ? <Tag>Session {sessionId.slice(0, 8)}</Tag> : null}
+          {sessionId ? <Tag>会话 {sessionId.slice(0, 8)}</Tag> : null}
           {postActionTopology ? (
             <Tag color="warning">第 6 步无效路径 {Object.values(postActionRoutes).filter((route) => !route.valid).length}</Tag>
           ) : null}
@@ -345,7 +366,7 @@ function SimulationRunContent() {
           },
           {
             key: "three_stage_comparison",
-            label: "正常—故障对比",
+            label: "结果分析",
             children:
               faultImpactStatus === COMPLETED && faultImpact ? (
                 <ComparisonResults
@@ -356,6 +377,13 @@ function SimulationRunContent() {
                   beforeHealingMetrics={beforeHealingMetrics}
                   afterHealingMetrics={afterHealingMetrics}
                   faultImpact={faultImpact}
+                  nodes={nodes}
+                  links={links}
+                  selectedService={selectedService}
+                  nominalTopology={nominalTopology}
+                  healedTopology={healedTopology}
+                  nominalRoute={selectedService ? nominalRoutes[selectedService.id] : undefined}
+                  healedRoute={selectedService ? healedRoutes[selectedService.id] : undefined}
                   onSelectNode={selectFaultImpactNode}
                   onSelectLink={selectFaultImpactLink}
                 />
@@ -418,7 +446,7 @@ function FaultPlanPanel({
         <Select
           className="full-width"
           value={value}
-          options={catalogItems.map((item) => ({ value: item.id, label: item.display_name_zh ? `${item.display_name_zh} / ${item.id}` : item.id }))}
+          options={catalogItems.map((item) => ({ value: item.id, label: `${faultDisplayName(item.id, item.display_name_zh)} / ${item.id}` }))}
           onChange={(type) => updateFaultType(fault, type, faultCatalog, nodes, links, onUpdate)}
         />
       )
@@ -454,6 +482,11 @@ function FaultPlanPanel({
     }
   ];
 
+  const selectedNodeIds = selectedFault && nodes.some((node) => node.id === selectedFault.target) ? [selectedFault.target] : [];
+  const selectedLinkIds = selectedFault && links.some((link, index) => (link.id || linkKey(link, index)) === selectedFault.target) ? [selectedFault.target] : [];
+  const affectedRfLinks = selectedFault?.target === "all_rf_links" ? links.map((link, index) => link.id || linkKey(link, index)) : [];
+  const cannotLocate = Boolean(selectedFault && !selectedNodeIds.length && !selectedLinkIds.length && selectedFault.target !== "all_rf_links" && selectedFault.target !== "global");
+
   return (
     <Card
       size="small"
@@ -465,16 +498,34 @@ function FaultPlanPanel({
       }
     >
       <FaultTimeline faults={faults} duration={scenarioDuration} nodes={nodes} links={links} faultCatalog={faultCatalog} selectedFaultId={selectedFault?.id ?? null} onSelectFault={onSelectFault} />
-      <Table
-        size="small"
-        rowKey="id"
-        columns={columns}
-        dataSource={faults}
-        pagination={false}
-        rowClassName={(fault) => (fault.id === selectedFault?.id ? "fault-row-selected" : "")}
-        onRow={(fault) => ({ onClick: () => onSelectFault(fault.id) })}
-      />
-      <FaultPropertyPanel fault={selectedFault} nodes={nodes} links={links} scenarioDuration={scenarioDuration} faultCatalog={faultCatalog} onUpdate={onUpdate} onToggle={onToggle} />
+      <div className="fault-plan-workspace">
+        <div className="fault-plan-list">
+          <Table
+            size="small"
+            rowKey="id"
+            columns={columns.filter((column) => !("dataIndex" in column) || !["start_s", "duration_s", "severity"].includes(String(column.dataIndex ?? "")))}
+            dataSource={faults}
+            pagination={false}
+            rowClassName={(fault) => (fault.id === selectedFault?.id ? "fault-row-selected" : "")}
+            onRow={(fault) => ({ onClick: () => onSelectFault(fault.id) })}
+          />
+        </div>
+        <div className="fault-plan-topology">
+          <UnifiedLunarNetworkGraph
+            projectNodes={nodes}
+            projectLinks={links}
+            stage="fault_plan"
+            selectedNodeIds={selectedNodeIds}
+            selectedLinkIds={selectedLinkIds}
+            degradedLinkIds={affectedRfLinks}
+          />
+          <Alert type="info" showIcon message="此处仅预览计划目标，故障尚未注入。" />
+          {cannotLocate ? <Alert type="warning" showIcon message={`无法在当前拓扑定位目标：${selectedFault?.target}`} /> : null}
+        </div>
+        <div className="fault-plan-detail">
+          <FaultPropertyPanel fault={selectedFault} nodes={nodes} links={links} scenarioDuration={scenarioDuration} faultCatalog={faultCatalog} onUpdate={onUpdate} onToggle={onToggle} />
+        </div>
+      </div>
       {catalogItems.some((item) => item.implementation_status === "registered_only") ? (
         <Typography.Paragraph type="secondary">
           “仅登记”表示该故障已纳入故障库，但当前 MVP 尚未实现专属退化作用。
@@ -604,7 +655,7 @@ function FaultPropertyPanel({
         </Descriptions.Item>
         <Descriptions.Item label="实现状态">{implementationTag(catalog)}</Descriptions.Item>
         <Descriptions.Item label="描述">{catalog?.description_zh ?? catalog?.description ?? "-"}</Descriptions.Item>
-        <Descriptions.Item label="已实现效果">{catalog?.implemented_effect ?? "-"}</Descriptions.Item>
+        <Descriptions.Item label="已实现效果">{engineeringTextDisplayName(catalog?.implemented_effect)}</Descriptions.Item>
       </Descriptions>
       <Typography.Paragraph type="secondary" className="fault-warning">
         严重度表示故障强度，不是发生概率。
@@ -740,7 +791,7 @@ function HealingActionsResults({
         type="warning"
         showIcon
         message="第 6 步只执行非路由自愈动作，不会提前重路由；当前业务路径仍为故障后继承路径。"
-        description={`pending_route_recalculation = ${String(pendingRouteRecalculation)}`}
+        description={`待重新计算路径：${pendingRouteRecalculation ? "是" : "否"}`}
       />
       <HealingActionTable actions={actions} />
       {topology ? (
@@ -806,12 +857,12 @@ function HealingActionTable({ actions }: { actions: HealingActionResponse[] }) {
         pagination={false}
         columns={[
           { title: "时间 s", dataIndex: "time_s" },
-          { title: "策略 ID", dataIndex: "strategy" },
-          { title: "目标", dataIndex: "target" },
-          { title: "动作", dataIndex: "action" },
+          { title: "自愈策略", render: (_, row) => `${healingDisplayName(row.strategy)}（${row.strategy}）` },
+          { title: "目标", render: (_, row) => engineeringTextDisplayName(row.target) },
+          { title: "动作", render: (_, row) => engineeringTextDisplayName(row.action) },
           { title: "成功", render: (_, row) => <Tag color={row.success ? "success" : "error"}>{row.success ? "成功" : "失败"}</Tag> },
           { title: "响应 ms", render: (_, row) => formatSimulationNumber(row.measured_response_ms) },
-          { title: "备注", dataIndex: "notes" }
+          { title: "备注", render: (_, row) => engineeringTextDisplayName(row.notes) }
         ]}
       />
     </Card>
@@ -826,6 +877,13 @@ function ComparisonResults({
   beforeHealingMetrics,
   afterHealingMetrics,
   faultImpact,
+  nodes,
+  links,
+  selectedService,
+  nominalTopology,
+  healedTopology,
+  nominalRoute,
+  healedRoute,
   onSelectNode,
   onSelectLink
 }: {
@@ -836,6 +894,13 @@ function ComparisonResults({
   beforeHealingMetrics: MetricRowResponse[];
   afterHealingMetrics: MetricRowResponse[];
   faultImpact: FaultImpactSummaryResponse;
+  nodes: NodePayload[];
+  links: LinkPayload[];
+  selectedService: ServicePayload | null;
+  nominalTopology: GraphSnapshotResponse | null;
+  healedTopology: GraphSnapshotResponse | null;
+  nominalRoute?: RouteSnapshotItemResponse;
+  healedRoute?: RouteSnapshotItemResponse;
   onSelectNode: (nodeId: string) => void;
   onSelectLink: (linkId: string | null) => void;
 }) {
@@ -845,7 +910,7 @@ function ComparisonResults({
   const compareRows = services.map((service) => ({ service, nominal: nominalById.get(service.id), before: beforeById.get(service.id), after: afterById.get(service.id) }));
   return (
     <Space direction="vertical" className="full-width">
-      <Card size="small" title="故障影响总览">
+      <Card size="small" title="故障对象与主要后果">
         <Space wrap>
           <ObjectTags title="失效节点" values={faultImpact.affected_node_ids} color="error" onClick={(value) => value && onSelectNode(value)} />
           <ObjectTags title="失效链路" values={faultImpact.failed_link_ids} color="error" onClick={onSelectLink} />
@@ -856,7 +921,16 @@ function ComparisonResults({
           <Tag>活动节点 {String(faultImpact.summary.active_node_count ?? "-")}</Tag>
           <Tag>活动链路 {String(faultImpact.summary.active_edge_count ?? "-")}</Tag>
         </Space>
+        <Typography.Paragraph className="impact-summary-copy">
+          当前故障造成 {faultImpact.affected_node_ids.length} 个节点和 {faultImpact.failed_link_ids.length} 条链路失效，
+          {faultImpact.degraded_link_ids.length} 条链路性能退化，{faultImpact.invalid_service_ids.length} 条业务路径失效，
+          {faultImpact.unreachable_service_ids.length} 项业务不可达。以上数量均来自本次后端故障快照。
+        </Typography.Paragraph>
       </Card>
+      <ThreeStageRecoveryPanel services={services} nominal={nominalServices} before={beforeHealingServices} after={afterHealingServices} />
+      <HealingAblationPanel />
+      <PathComparisonPanel nodes={nodes} links={links} service={selectedService} nominalTopology={nominalTopology} healedTopology={healedTopology} nominalRoute={nominalRoute} healedRoute={healedRoute} />
+      <PropagationCauseChain faultImpact={faultImpact} />
       <ThreeStageServiceTable rows={compareRows} />
       <Table
         size="small"
@@ -865,7 +939,7 @@ function ComparisonResults({
         pagination={false}
         scroll={{ x: 1900 }}
         columns={[
-          { title: "业务", fixed: "left", render: (_, row) => row.service.name || row.service.id },
+          { title: "业务", fixed: "left", render: (_, row) => serviceDisplayName(row.service) },
           { title: "吞吐 正常", render: (_, row) => metricValue(row.nominal?.throughput_mbps, " Mbps") },
           { title: "吞吐 故障后", render: (_, row) => metricValue(row.before?.throughput_mbps, " Mbps") },
           { title: "吞吐 变化", render: (_, row) => formatDelta(row.nominal?.throughput_mbps, row.before?.throughput_mbps) },
@@ -915,7 +989,7 @@ function ThreeStageServiceTable({
         pagination={false}
         scroll={{ x: 1500 }}
         columns={[
-          { title: "业务", fixed: "left", render: (_, row) => row.service.name || row.service.id },
+          { title: "业务", fixed: "left", render: (_, row) => serviceDisplayName(row.service) },
           { title: "吞吐 正常/故障/自愈", render: (_, row) => `${metricValue(row.nominal?.throughput_mbps, " Mbps")} / ${metricValue(row.before?.throughput_mbps, " Mbps")} / ${metricValue(row.after?.throughput_mbps, " Mbps")}` },
           { title: "时延 正常/故障/自愈", render: (_, row) => `${metricValue(row.nominal?.end_to_end_delay_ms, " ms")} / ${metricValue(row.before?.end_to_end_delay_ms, " ms")} / ${metricValue(row.after?.end_to_end_delay_ms, " ms")}` },
           { title: "丢包 正常/故障/自愈", render: (_, row) => `${formatSimulationNumber(row.nominal?.packet_loss_rate ?? null, 6)} / ${formatSimulationNumber(row.before?.packet_loss_rate ?? null, 6)} / ${formatSimulationNumber(row.after?.packet_loss_rate ?? null, 6)}` },
@@ -974,15 +1048,15 @@ function IndicatorResults({
         dataSource={indicators}
         pagination={{ pageSize: 8 }}
         columns={[
-          { title: "指标", dataIndex: "indicator" },
+          { title: "指标", render: (_, row) => indicatorDisplayMeta(row.id, row.indicator, row.unit, row.layer).name },
           { title: "ID", dataIndex: "id" },
-          { title: "层级", dataIndex: "layer" },
-          { title: "metric", dataIndex: "metric" },
-          { title: "判定", render: (_, row) => `${formatSimulationNumber(row.actual)} ${row.operator} ${formatSimulationNumber(row.threshold)} ${row.unit}` },
+          { title: "层级", render: (_, row) => indicatorDisplayMeta(row.id, row.indicator, row.unit, row.layer).layer },
+          { title: "计算字段", render: (_, row) => `${metricDisplayName(row.metric)}（${row.metric}）` },
+          { title: "判定", render: (_, row) => `${formatSimulationNumber(row.actual)} ${row.operator} ${formatSimulationNumber(row.threshold)} ${unitDisplayName(row.unit)}` },
           { title: "适用", render: (_, row) => boolLabel(row.applicable) },
           { title: "状态", render: (_, row) => <Tag color={row.status === "passed" ? "success" : row.status === "failed" ? "error" : "default"}>{indicatorStatusLabel(row.status)}</Tag> },
-          { title: "不适用原因", render: (_, row) => row.not_applicable_reason || "-" },
-          { title: "验证方法", dataIndex: "verification_method" }
+          { title: "不适用原因", render: (_, row) => engineeringTextDisplayName(row.not_applicable_reason) },
+          { title: "验证方法", render: (_, row) => engineeringTextDisplayName(row.verification_method) }
         ]}
       />
       <Card size="small" title={`成果文件 ${artifacts.length} 个`}>
@@ -994,10 +1068,10 @@ function IndicatorResults({
           pagination={{ pageSize: 8 }}
           columns={[
             { title: "文件名", dataIndex: "filename" },
-            { title: "类型", dataIndex: "file_type" },
+            { title: "类型", render: (_, row) => row.file_type === "csv" ? "数据表" : row.file_type === "png" ? "拓扑图片" : row.file_type === "markdown" ? "报告" : row.file_type ?? "文件" },
             { title: "存在", render: (_, row) => boolLabel(row.exists) },
             { title: "大小", render: (_, row) => `${row.size_bytes} B` },
-            { title: "用途", render: (_, row) => row.purpose_zh ?? "-" },
+            { title: "用途", render: (_, row) => artifactPurpose(row.filename, row.purpose_zh) },
             { title: "下载", render: (_, row) => <Button size="small" disabled={!row.exists || !sessionId} onClick={() => void download(row.filename)}>下载</Button> }
           ]}
         />
@@ -1007,7 +1081,7 @@ function IndicatorResults({
 }
 
 function ServiceResultTable({ services, results, nodes, onSelectService }: { services: ServicePayload[]; results: ServiceSimulationResultResponse[]; nodes: NodePayload[]; onSelectService: (serviceId: string) => void }) {
-  const serviceNames = new Map(services.map((service) => [service.id, service.name || service.id]));
+  const serviceNames = new Map(services.map((service) => [service.id, serviceDisplayName(service)]));
   return (
     <Table
       size="small"
@@ -1031,9 +1105,9 @@ function ServiceResultTable({ services, results, nodes, onSelectService }: { ser
         { title: "成功率", render: (_, row) => formatSimulationNumber(row.success_rate, 6) },
         { title: "中断时间", render: (_, row) => `${formatSimulationNumber(row.interruption_s)} s` },
         { title: "是否降级", render: (_, row) => (row.degraded ? <Tag color="warning">降级</Tag> : <Tag>否</Tag>) },
-        { title: "路由来源", render: (_, row) => row.route_source ?? "-" },
-        { title: "失败原因", render: (_, row) => row.failure_reason || "-" },
-        { title: "备注", render: (_, row) => row.notes || "-" }
+        { title: "路由来源", render: (_, row) => routeSourceDisplayName(row.route_source) },
+        { title: "失败原因", render: (_, row) => engineeringTextDisplayName(row.failure_reason) },
+        { title: "备注", render: (_, row) => engineeringTextDisplayName(row.notes) }
       ]}
     />
   );
@@ -1068,9 +1142,9 @@ function FaultedRoutesTable({ services, routes, nodes, onSelectService }: { serv
       pagination={false}
       onRow={(record) => ({ onClick: () => onSelectService(record.id) })}
       columns={[
-        { title: "业务", render: (_, service) => service.name || service.id },
+        { title: "业务", render: (_, service) => serviceDisplayName(service) },
         { title: "路径状态", render: (_, service) => <Tag color={routes[service.id]?.valid ? "success" : "error"}>{routes[service.id]?.valid ? "有效" : "无效"}</Tag> },
-        { title: "路由来源", render: (_, service) => routes[service.id]?.route_source ?? "-" },
+        { title: "路由来源", render: (_, service) => routeSourceDisplayName(routes[service.id]?.route_source) },
         { title: "完整路径", render: (_, service) => routes[service.id]?.path.map((nodeId) => formatNodeDisplay(nodeId, nodes)).join(" -> ") || "-" }
       ]}
     />
@@ -1082,13 +1156,13 @@ function RouteDetails({ selectedService, route, nodes }: { selectedService: Serv
   if (!route) return <Card size="small"><Text type="secondary">尚无当前业务路径。</Text></Card>;
   return (
     <Descriptions size="small" column={1} bordered>
-      <Descriptions.Item label="业务">{selectedService.name || selectedService.id}</Descriptions.Item>
+      <Descriptions.Item label="业务">{serviceDisplayName(selectedService)}（内部 ID：{selectedService.id}）</Descriptions.Item>
       <Descriptions.Item label="源节点">{formatNodeDisplay(route.source, nodes)}</Descriptions.Item>
       <Descriptions.Item label="目标节点">{formatNodeDisplay(route.target, nodes)}</Descriptions.Item>
       <Descriptions.Item label="路径状态">{route.valid ? "有效" : "无效"}</Descriptions.Item>
-      <Descriptions.Item label="路由来源">{route.route_source ?? "-"}</Descriptions.Item>
+      <Descriptions.Item label="路由来源">{routeSourceDisplayName(route.route_source)}</Descriptions.Item>
       <Descriptions.Item label="完整路径">{route.path.map((nodeId) => formatNodeDisplay(nodeId, nodes)).join(" -> ") || "-"}</Descriptions.Item>
-      <Descriptions.Item label="备注">{route.notes || "-"}</Descriptions.Item>
+      <Descriptions.Item label="备注">{engineeringTextDisplayName(route.notes)}</Descriptions.Item>
     </Descriptions>
   );
 }
@@ -1118,10 +1192,10 @@ function MetricTable({ metrics, title = "指标" }: { metrics: MetricRowResponse
         dataSource={metrics}
         pagination={{ pageSize: 8 }}
         columns={[
-          { title: "阶段", dataIndex: "phase" },
+          { title: "阶段", render: (_, row) => stageDisplayName(row.phase) },
           { title: "分组", render: (_, row) => metricMeta(row.layer, row.metric).group },
-          { title: "层级", dataIndex: "layer" },
-          { title: "指标中文名", render: (_, row) => metricMeta(row.layer, row.metric).label },
+          { title: "层级", render: (_, row) => stageDisplayName(row.layer) },
+          { title: "指标中文名", render: (_, row) => metricDisplayName(row.metric) },
           { title: "原始指标 ID", dataIndex: "metric" },
           { title: "值", render: (_, row) => `${formatSimulationNumber(row.value)}${metricMeta(row.layer, row.metric).unit ? ` ${metricMeta(row.layer, row.metric).unit}` : ""}` }
         ]}
@@ -1140,8 +1214,8 @@ function MetricDeltaTable({ deltas }: { deltas: MetricDeltaResponse[] }) {
         pagination={{ pageSize: 8 }}
         columns={[
           { title: "分组", render: (_, row) => metricMeta(row.layer, row.metric).group },
-          { title: "层级", dataIndex: "layer" },
-          { title: "指标中文名", render: (_, row) => metricMeta(row.layer, row.metric).label },
+          { title: "层级", render: (_, row) => stageDisplayName(row.layer) },
+          { title: "指标中文名", render: (_, row) => metricDisplayName(row.metric) },
           { title: "原始指标 ID", dataIndex: "metric" },
           { title: "正常值", render: (_, row) => formatSimulationNumber(row.nominal_value) },
           { title: "故障后值", render: (_, row) => formatSimulationNumber(row.before_healing_value) },
@@ -1169,8 +1243,8 @@ function PhysicalValidationTable({ validation, physicalMetrics }: { validation: 
           { title: "误差 %", render: (_, row) => formatSimulationNumber(row.error_pct ?? null) },
           { title: "目标误差 %", render: (_, row) => formatSimulationNumber(row.target_error_pct ?? null) },
           { title: "结果", render: (_, row) => <Tag color={row.passed ? "success" : "error"}>{row.passed ? "通过" : "未通过"}</Tag> },
-          { title: "参考来源", dataIndex: "reference_source" },
-          { title: "验证方法", dataIndex: "verification_method" }
+          { title: "参考来源", render: (_, row) => referenceSourceDisplayName(row.reference_source) },
+          { title: "验证方法", render: (_, row) => engineeringTextDisplayName(row.verification_method) }
         ]}
       />
       <Descriptions size="small" column={3} bordered className="compact-descriptions">
@@ -1187,23 +1261,23 @@ function PropagationPanel({ faultImpact }: { faultImpact: FaultImpactSummaryResp
     <Card size="small" title="故障传播分析">
       <Space direction="vertical" className="full-width">
         <Table size="small" rowKey={(row) => `${row.root_fault}:${row.predicted_effect}`} dataSource={faultImpact.propagation_predictions} pagination={false} columns={[
-          { title: "根故障", dataIndex: "root_fault" },
-          { title: "预测影响", dataIndex: "predicted_effect" },
-          { title: "预测层级", dataIndex: "predicted_layer" },
+          { title: "根故障", render: (_, row) => `${propagationEventDisplayName(row.root_fault)}（${row.root_fault}）` },
+          { title: "预测影响", render: (_, row) => `${propagationEventDisplayName(row.predicted_effect)}（${row.predicted_effect}）` },
+          { title: "预测层级", render: (_, row) => stageDisplayName(row.predicted_layer) },
           { title: "预测概率", render: (_, row) => formatSimulationNumber(row.predicted_probability) },
           { title: "预测传播时延 ms", render: (_, row) => formatSimulationNumber(row.predicted_delay_ms) },
-          { title: "传播路径", dataIndex: "propagation_path" },
+          { title: "传播路径", render: (_, row) => row.propagation_path.split(/\s*(?:->|→)\s*/).map(propagationEventDisplayName).join(" → ") },
           { title: "置信度", render: (_, row) => formatSimulationNumber(row.confidence) }
         ]} />
         <Table size="small" rowKey={(row) => `${row.source}:${row.observed_effect}`} dataSource={faultImpact.observed_impacts} pagination={false} columns={[
-          { title: "观测影响", dataIndex: "observed_effect" },
-          { title: "观测层级", dataIndex: "observed_layer" },
-          { title: "数据来源", dataIndex: "source" },
+          { title: "观测影响", render: (_, row) => `${propagationEventDisplayName(row.observed_effect)}（${row.observed_effect}）` },
+          { title: "观测层级", render: (_, row) => stageDisplayName(row.observed_layer) },
+          { title: "数据来源", render: (_, row) => engineeringTextDisplayName(row.source) },
           { title: "观测时延 ms", render: (_, row) => formatSimulationNumber(row.observed_delay_ms) },
-          { title: "证据", dataIndex: "evidence" }
+          { title: "证据", render: (_, row) => engineeringTextDisplayName(row.evidence) }
         ]} />
         <Table size="small" rowKey={(row) => row.predicted_effect} dataSource={faultImpact.propagation_comparison} pagination={false} columns={[
-          { title: "预测影响", dataIndex: "predicted_effect" },
+          { title: "预测影响", render: (_, row) => `${propagationEventDisplayName(row.predicted_effect)}（${row.predicted_effect}）` },
           { title: "观测到", render: (_, row) => <Tag color={row.observed ? "success" : "default"}>{row.observed ? "是" : "否"}</Tag> },
           { title: "TP/FP/FN", render: (_, row) => comparisonTags(row.true_positive, row.false_positive, row.false_negative) },
           { title: "预测时延 ms", render: (_, row) => formatSimulationNumber(row.predicted_delay_ms) },
@@ -1212,7 +1286,7 @@ function PropagationPanel({ faultImpact }: { faultImpact: FaultImpactSummaryResp
         ]} />
         <Descriptions size="small" column={3} bordered>
           {Object.entries(faultImpact.propagation_metrics ?? {}).map(([key, value]) => (
-            <Descriptions.Item key={key} label={`${propagationMetricLabel(key)} (${key})`}>{formatSimulationNumber(value as never)}</Descriptions.Item>
+            <Descriptions.Item key={key} label={`${propagationMetricLabel(key)}（${key}）`}>{formatSimulationNumber(value as never)}</Descriptions.Item>
           ))}
         </Descriptions>
       </Space>
@@ -1289,7 +1363,7 @@ function targetOptions(catalog: CatalogItemResponse | undefined, nodes: NodePayl
   else options = nodeOptions;
 
   if (currentTarget && !optionContains(options, currentTarget)) {
-    options = [{ value: currentTarget, label: `${currentTarget} / 历史或自定义目标` }, ...options];
+    options = [{ value: currentTarget, label: `${formatTargetDisplay(currentTarget, nodes, links)} / 场景已配置目标` }, ...options];
   }
   return options;
 }
@@ -1309,7 +1383,8 @@ function optionContains(options: DefaultOptionType[], value: string): boolean {
 }
 
 function implementationTag(item: CatalogItemResponse | undefined) {
-  return item?.implementation_status === "registered_only" ? <Tag color="warning">仅登记</Tag> : <Tag color="success">已实现</Tag>;
+  const status = item?.implementation_status ?? "implemented";
+  return <Tag color={status === "registered_only" ? "warning" : "success"}>{statusDisplayName(status)}</Tag>;
 }
 
 function statusColor(status: string): string {
@@ -1327,14 +1402,11 @@ function isAnyBusy(...statuses: string[]): boolean {
 function formatNodeDisplay(nodeId: string, nodes: NodePayload[]): string {
   const node = nodes.find((item) => item.id === nodeId);
   if (!node) return `${nodeId}（节点不存在）`;
-  return node.name ? `${node.name}（${node.id}）` : node.id;
+  return `${nodeDisplayName(node)}（内部 ID：${node.id}）`;
 }
 
 function translateAppliedEffect(effect: string): string {
-  if (effect === "fault registered without additional MVP degradation") {
-    return "故障已登记，但当前 MVP 未施加专属退化作用。";
-  }
-  return effect;
+  return engineeringTextDisplayName(effect);
 }
 
 function formatDelta(before: unknown, after: unknown): string {

@@ -8,16 +8,14 @@ import {
 } from "@ant-design/icons";
 import { App, Button, Card, Descriptions, Empty, Form, Input, InputNumber, Popconfirm, Select, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { Background, Controls, MiniMap, ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import { useHealthQuery } from "../api/health";
 import type { NodePayload, RouteSnapshotItemResponse, ServicePayload } from "../api/contracts";
 import { evaluateQosPrecheck, formatNumber, formatScientific, type QosPrecheckResult } from "../features/routing/qosPrecheck";
-import { applyRouteHighlight } from "../features/routing/pathHighlight";
 import { servicePresets, serviceTypeLabel } from "../features/services/servicePresets";
-import { lunarNodeTypes } from "../features/topology/nodeTypes";
+import { UnifiedLunarNetworkGraph } from "../features/topology/unified/UnifiedLunarNetworkGraph";
+import { engineeringTextDisplayName, nodeDisplayName, routeSourceDisplayName, serviceDisplayName } from "../i18n/displayNames";
 import { useProjectStore } from "../stores/projectStore";
 import { useServiceRoutingStore, type RouteStatus } from "../stores/serviceRoutingStore";
-import { projectToEditorState } from "../utils/topologyTransforms";
 
 interface ServiceFormValues {
   name?: string;
@@ -51,11 +49,7 @@ export function ServiceRoutingPage() {
     );
   }
 
-  return (
-    <ReactFlowProvider>
-      <ServiceRoutingContent />
-    </ReactFlowProvider>
-  );
+  return <ServiceRoutingContent />;
 }
 
 function ServiceRoutingContent() {
@@ -110,14 +104,8 @@ function ServiceRoutingContent() {
     [nodes]
   );
 
-  const flow = useMemo(() => {
-    if (!scenario) return { nodes: [], edges: [] };
-    const base = projectToEditorState(scenario);
-    return applyRouteHighlight(base.nodes, base.edges, currentRoute ?? null);
-  }, [scenario, currentRoute]);
-
   const columns: ColumnsType<ServicePayload> = [
-    { title: "业务名称", dataIndex: "name", key: "name", render: (value, row) => value || row.id },
+    { title: "业务名称", dataIndex: "name", key: "name", render: (_, row) => serviceDisplayName(row) },
     { title: "业务 ID", dataIndex: "id", key: "id", ellipsis: true },
     { title: "业务类型", dataIndex: "service_type", key: "service_type", render: serviceTypeLabel },
     { title: "源节点", dataIndex: "source", key: "source", render: (value) => formatNodeDisplay(String(value), nodes) },
@@ -180,8 +168,8 @@ function ServiceRoutingContent() {
           </Button>
           <Tag color={statusColor(backendTopologyStatus)}>拓扑：{backendTopologyStatus}</Tag>
           <Tag color={statusColor(routeStatus)}>路径：{routeStatus}</Tag>
-          <Tag>算法：最小时延路径 / shortest_delay</Tag>
-          {sessionId ? <Tag>Session {sessionId.slice(0, 8)}</Tag> : null}
+          <Tag>算法：最小时延路由（内部 ID：shortest_delay）</Tag>
+          {sessionId ? <Tag>会话 {sessionId.slice(0, 8)}</Tag> : null}
           {error ? <Tag color="error">{error}</Tag> : null}
         </Space>
         <Typography.Text type="secondary">
@@ -231,11 +219,15 @@ function ServiceRoutingContent() {
         </Card>
       </aside>
       <section className="routing-flow-panel">
-        <ReactFlow nodes={flow.nodes} edges={flow.edges} nodeTypes={lunarNodeTypes} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} fitView>
-          <Background />
-          <Controls />
-          <MiniMap pannable zoomable />
-        </ReactFlow>
+        <UnifiedLunarNetworkGraph
+          projectNodes={scenario?.nodes ?? []}
+          projectLinks={scenario?.links ?? []}
+          snapshot={topologySnapshot}
+          selectedRoute={currentRoute}
+          selectedServiceId={selectedService?.id}
+          stage="service"
+          showLinkLabels
+        />
       </section>
       <aside className="route-detail-panel">
         <Card title="业务/路径详情" size="small">
@@ -357,7 +349,7 @@ function ServiceRoutingContent() {
 function formatNodeDisplay(nodeId: string, nodes: NodePayload[]): string {
   const node = nodes.find((item) => item.id === nodeId);
   if (!node) return `${nodeId}（节点不存在）`;
-  return node.name ? `${node.name}（${node.id}）` : node.id;
+  return `${nodeDisplayName(node)}（内部 ID：${node.id}）`;
 }
 
 function RouteDetails({
@@ -418,7 +410,7 @@ function RouteDetails({
         <Descriptions.Item label="源节点">{formatNodeDisplay(service.source, nodes)}</Descriptions.Item>
         <Descriptions.Item label="目标节点">{formatNodeDisplay(service.target, nodes)}</Descriptions.Item>
         <Descriptions.Item label="路径状态">{route?.valid ? "有效" : route ? "无路径" : "尚未计算"}</Descriptions.Item>
-        <Descriptions.Item label="路由来源">{route?.route_source ?? "-"}</Descriptions.Item>
+        <Descriptions.Item label="路由来源">{routeSourceDisplayName(route?.route_source)}</Descriptions.Item>
         <Descriptions.Item label="完整节点序列">{nodePath}</Descriptions.Item>
         <Descriptions.Item label="经过节点数">{route?.path?.length ?? 0}</Descriptions.Item>
         <Descriptions.Item label="经过链路数">{route?.path ? Math.max(0, route.path.length - 1) : 0}</Descriptions.Item>
@@ -427,7 +419,7 @@ function RouteDetails({
         <Descriptions.Item label="路径丢包率">{formatScientific(route?.packet_loss_rate)}</Descriptions.Item>
         <Descriptions.Item label="路径可用率">{formatNumber(route?.availability, 6)}</Descriptions.Item>
         <Descriptions.Item label="切换扰动">{formatNumber(route?.handover_disturbance_ms)} ms</Descriptions.Item>
-        <Descriptions.Item label="后端备注">{route?.notes || "-"}</Descriptions.Item>
+        <Descriptions.Item label="后端备注">{engineeringTextDisplayName(route?.notes)}</Descriptions.Item>
       </Descriptions>
       <Typography.Text type="secondary">路径级预检查只比较当前静态路径指标，不等同于第 3 步业务仿真最终结论。</Typography.Text>
       {qos ? <Tag color={qosColor(qos.overallStatus)}>{qosLabel(qos.overallStatus)}</Tag> : null}

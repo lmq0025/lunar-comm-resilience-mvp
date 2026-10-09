@@ -3,7 +3,7 @@ import { startVitest } from "vitest/node";
 
 const ctx = await startVitest(
   "test",
-  [],
+  process.argv.slice(2),
   {
     run: true,
     config: false,

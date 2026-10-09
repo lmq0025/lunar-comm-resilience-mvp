@@ -63,13 +63,8 @@ export const useTopologyEditorStore = create<TopologyEditorStoreState>((set, get
 
   loadScenario: (scenario) => {
     const state = projectToEditorState(scenario);
-    const scenarioNodes = Array.isArray(scenario?.nodes) ? scenario.nodes : [];
-    const hasScenarioCoordinates = scenarioNodes.some(
-      (node) => typeof node.position_x === "number" && typeof node.position_y === "number"
-    );
-    const laidOut = hasScenarioCoordinates ? state.nodes : autoLayout(state.nodes, state.edges);
     set({
-      nodes: laidOut,
+      nodes: state.nodes,
       edges: state.edges,
       selected: null,
       selectedNodeIds: [],
@@ -173,7 +168,7 @@ export const useTopologyEditorStore = create<TopologyEditorStoreState>((set, get
         id,
         source: payload.source,
         target: payload.target,
-        type: "default",
+        type: "unifiedLink",
         label: edgeLabel(edgePayload),
         style: edgePayload.active === false ? { strokeDasharray: "6 5", stroke: "#9aa5ad" } : undefined,
         data: { payload: edgePayload, label: edgeLabel(edgePayload) }

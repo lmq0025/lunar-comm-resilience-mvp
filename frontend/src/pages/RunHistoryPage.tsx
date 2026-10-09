@@ -7,6 +7,7 @@ import type { SimulationRunResponse } from "../api/contracts";
 import { useProjectStore } from "../stores/projectStore";
 import { restorePersistedRun } from "../stores/serviceRoutingStore";
 import { useUiStore } from "../stores/uiStore";
+import { statusDisplayName } from "../i18n/displayNames";
 
 export function RunHistoryPage() {
   const { message } = App.useApp();
@@ -25,7 +26,7 @@ export function RunHistoryPage() {
       setRuns(response.runs);
       setSelected((current) => response.runs.find((run) => run.run_id === current?.run_id) ?? response.runs[0] ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load run history");
+      setError(err instanceof Error ? err.message : "运行历史加载失败");
     } finally {
       setLoading(false);
     }
@@ -43,7 +44,7 @@ export function RunHistoryPage() {
       message.success("运行状态和各步骤结果已恢复");
       setActiveMenu("simulation");
     } catch (err) {
-      message.error(err instanceof Error ? err.message : "Restore failed");
+      message.error(err instanceof Error ? err.message : "运行恢复失败");
     } finally {
       setLoading(false);
     }
@@ -52,12 +53,12 @@ export function RunHistoryPage() {
   const columns: ColumnsType<SimulationRunResponse> = [
     { title: "运行 ID", dataIndex: "run_id", ellipsis: true },
     { title: "场景", dataIndex: "scenario_name", ellipsis: true },
-    { title: "状态", dataIndex: "status", render: (value) => <Tag color={value === "completed" ? "success" : "processing"}>{value}</Tag> },
-    { title: "当前步骤", dataIndex: "current_step" },
+    { title: "状态", dataIndex: "status", render: (value) => <Tag color={value === "completed" ? "success" : "processing"}>{statusDisplayName(String(value))}</Tag> },
+    { title: "当前步骤", dataIndex: "current_step", render: (value) => statusDisplayName(String(value)) },
     { title: "步骤", render: (_, run) => `${run.completed_steps.length}/9` },
     { title: "更新时间", dataIndex: "updated_at", render: (value) => new Date(value).toLocaleString() },
     {
-      title: "Action",
+      title: "操作",
       render: (_, run) => (
         <Button size="small" icon={<RollbackOutlined />} onClick={() => restore(run)}>
           恢复运行
@@ -86,12 +87,12 @@ export function RunHistoryPage() {
       />
       {selected ? (
         <Descriptions bordered size="small" column={2}>
-          <Descriptions.Item label="Run ID">{selected.run_id}</Descriptions.Item>
-          <Descriptions.Item label="Session ID">{selected.session_id}</Descriptions.Item>
-          <Descriptions.Item label="Project revision">{selected.project_revision ?? "-"}</Descriptions.Item>
-          <Descriptions.Item label="Artifacts">{selected.artifacts.length}</Descriptions.Item>
-          <Descriptions.Item label="Completed steps" span={2}>
-            <Space wrap>{selected.completed_steps.map((step) => <Tag key={step}>{step}</Tag>)}</Space>
+          <Descriptions.Item label="运行 ID">{selected.run_id}</Descriptions.Item>
+          <Descriptions.Item label="会话 ID">{selected.session_id}</Descriptions.Item>
+          <Descriptions.Item label="项目修订版本">{selected.project_revision ?? "-"}</Descriptions.Item>
+          <Descriptions.Item label="成果文件">{selected.artifacts.length}</Descriptions.Item>
+          <Descriptions.Item label="已完成步骤" span={2}>
+            <Space wrap>{selected.completed_steps.map((step) => <Tag key={step}>{statusDisplayName(step)}</Tag>)}</Space>
           </Descriptions.Item>
         </Descriptions>
       ) : null}

@@ -3,6 +3,7 @@ import { useCatalogsQuery } from "../api/catalogs";
 import { HEALING_STRATEGY_IDS, healingCatalogItems, healingPreconditionHint, normalizeHealingEnabled } from "../features/healing/healingCatalog";
 import { useProjectStore } from "../stores/projectStore";
 import { useServiceRoutingStore } from "../stores/serviceRoutingStore";
+import { healingDisplayName, statusDisplayName } from "../i18n/displayNames";
 
 export function HealingStrategyPage() {
   const draftProject = useProjectStore((state) => state.draftProject);
@@ -65,18 +66,18 @@ export function HealingStrategyPage() {
           <Card
             key={item.id}
             size="small"
-            title={item.display_name_zh ?? item.id}
+            title={healingDisplayName(item.id, item.display_name_zh)}
             extra={<Switch checked={enabledSet.has(item.id)} onChange={(checked) => toggle(item.id, checked)} />}
           >
             <Space direction="vertical" className="full-width">
               <Space wrap>
-                <Tag>{item.id}</Tag>
+                <Tag>内部 ID：{item.id}</Tag>
                 <Tag color={item.execution_step === 7 ? "blue" : "green"}>第 {item.execution_step} 步</Tag>
                 <Tag>{item.strategy_category === "routing" ? "路由策略" : "非路由策略"}</Tag>
-                <Tag color="success">{item.implementation_status}</Tag>
+                <Tag color="success">{statusDisplayName(item.implementation_status ?? "implemented")}</Tag>
               </Space>
               <Typography.Paragraph>{item.description_zh ?? item.description}</Typography.Paragraph>
-              <Typography.Text type="secondary">作用：{item.implemented_effect ?? "-"}</Typography.Text>
+              <Typography.Text type="secondary">执行效果：以第 6/7 步后端自愈动作记录为准。</Typography.Text>
               <Typography.Text type="secondary">目标：{item.target_summary_zh ?? "-"}</Typography.Text>
               <Typography.Text type="secondary">前置条件：{item.preconditions_zh ?? "-"}</Typography.Text>
               <Alert type="info" showIcon message={healingPreconditionHint(item.id, scenario)} />

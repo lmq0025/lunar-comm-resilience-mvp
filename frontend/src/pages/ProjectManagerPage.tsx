@@ -113,7 +113,7 @@ export function ProjectManagerPage() {
           type="warning"
           showIcon
           message={saveStatus === "仅保存在本地草稿" ? "本地草稿，未同步到数据库" : "当前项目尚未保存"}
-          description={`${draftProject.name}：Nodes ${safeLength(draftProject.scenario.nodes)} / Links ${safeLength(draftProject.scenario.links)} / Services ${safeLength(draftProject.scenario.services)} / Faults ${safeLength(draftProject.scenario.faults?.schedule)} / Healing ${safeLength(draftProject.scenario.healing?.enabled)} / Indicators ${safeLength(draftProject.scenario.technical_indicators)}`}
+          description={`${draftProject.name}：节点 ${safeLength(draftProject.scenario.nodes)} / 链路 ${safeLength(draftProject.scenario.links)} / 业务 ${safeLength(draftProject.scenario.services)} / 故障 ${safeLength(draftProject.scenario.faults?.schedule)} / 自愈策略 ${safeLength(draftProject.scenario.healing?.enabled)} / 技术指标 ${safeLength(draftProject.scenario.technical_indicators)}`}
         />
       ) : null}
       <Table rowKey="projectId" loading={loadingProjects} columns={columns} dataSource={items} pagination={false} locale={{ emptyText: "数据库中暂无项目" }} />
